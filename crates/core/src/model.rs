@@ -160,7 +160,7 @@ pub struct DiffProgress {
     pub is_done: bool,
 }
 
-// === Lightweight Shallow Views for Frontend ===
+// === Lightweight Shallow Views for IPC/CLI/Frontend ===
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FileItemView {

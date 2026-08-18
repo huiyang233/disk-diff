@@ -25,6 +25,8 @@ dist-ssr
 *.sw?
 
 # Rust / Tauri build artifacts
+target
+target/
 src-tauri/target
 src-tauri/target/
 src-tauri/gen

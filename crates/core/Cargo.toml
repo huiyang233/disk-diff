@@ -1,0 +1,15 @@
+[package]
+name = "disk-diff-core"
+version = "0.1.0"
+description = "High performance disk space analyzer, snapshot compressor, and differential engine core"
+authors = ["Antigravity"]
+edition = "2021"
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+bincode = "1.3"
+zstd = "0.13"
+rayon = "1.10"
+chrono = { version = "0.4", features = ["serde"] }
+mimalloc = { version = "0.1", default-features = false }

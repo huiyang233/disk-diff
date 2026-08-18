@@ -1,8 +1,6 @@
 pub mod commands;
-pub mod diff;
-pub mod model;
-pub mod scanner;
-pub mod snapshot;
+
+pub use disk_diff_core as core;
 
 #[global_allocator]
 static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;

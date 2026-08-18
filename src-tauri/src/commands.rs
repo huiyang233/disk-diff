@@ -3,13 +3,11 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use tauri::{AppHandle, Emitter, State};
 
-use crate::diff::DiffEngine;
-use crate::model::{
-    DiffDirectoryView, DiffItemView, DiffNode, DiffProgress, DiffResult, DiffResultMeta,
-    DiffResultView, DirectoryView, FileItemView, FileNode, ScanResultView, Snapshot, SnapshotMeta,
+use disk_diff_core::{
+    DiffDirectoryView, DiffEngine, DiffItemView, DiffNode, DiffProgress, DiffResult, DiffResultMeta,
+    DiffResultView, DirectoryView, FileItemView, FileNode, ScanProgress, ScanResultView, Scanner,
+    Snapshot, SnapshotManager, SnapshotMeta,
 };
-use crate::scanner::Scanner;
-use crate::snapshot::SnapshotManager;
 
 pub struct AppState {
     pub cancel_flag: Arc<AtomicBool>,
@@ -198,7 +196,10 @@ pub async fn start_scan(
 
     let (snapshot, root_view, meta) = tauri::async_runtime::spawn_blocking(move || {
         let scanner = Scanner::new(cancel_flag);
-        let root_node = scanner.scan(&target_path, Some(&app_clone))?;
+        let progress_cb = |p: ScanProgress| {
+            let _ = app_clone.emit("scan-progress", p);
+        };
+        let root_node = scanner.scan(&target_path, Some(&progress_cb))?;
         let snapshot = SnapshotManager::create_snapshot(root_node, scan_path.clone(), None);
         let root_view = to_directory_view(&snapshot.root, &scan_path);
         let meta = snapshot.meta.clone();

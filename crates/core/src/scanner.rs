@@ -5,7 +5,6 @@ use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant, UNIX_EPOCH};
 use rayon::prelude::*;
-use tauri::{AppHandle, Emitter};
 
 use crate::model::{FileNode, ScanProgress};
 
@@ -59,44 +58,47 @@ impl Scanner {
         }
     }
 
-    pub fn scan(
+    pub fn scan<F>(
         &self,
         root_path: &Path,
-        app: Option<&AppHandle>,
-    ) -> Result<FileNode, String> {
+        progress_callback: Option<&F>,
+    ) -> Result<FileNode, String>
+    where
+        F: Fn(ScanProgress) + Send + Sync,
+    {
         let last_emit = Arc::new(Mutex::new(Instant::now()));
 
         let root_node = self.scan_dir_parallel(
             root_path,
             0,
-            app,
+            progress_callback,
             &last_emit,
         )?;
 
         // Send final 100% progress event
-        if let Some(app_handle) = app {
-            let _ = app_handle.emit(
-                "scan-progress",
-                ScanProgress {
-                    scanned_files: self.scanned_files.load(Ordering::Relaxed),
-                    scanned_dirs: self.scanned_dirs.load(Ordering::Relaxed),
-                    total_size: self.total_size.load(Ordering::Relaxed),
-                    current_path: root_path.to_string_lossy().to_string(),
-                    is_done: true,
-                },
-            );
+        if let Some(cb) = progress_callback {
+            cb(ScanProgress {
+                scanned_files: self.scanned_files.load(Ordering::Relaxed),
+                scanned_dirs: self.scanned_dirs.load(Ordering::Relaxed),
+                total_size: self.total_size.load(Ordering::Relaxed),
+                current_path: root_path.to_string_lossy().to_string(),
+                is_done: true,
+            });
         }
 
         Ok(root_node)
     }
 
-    fn scan_dir_parallel(
+    fn scan_dir_parallel<F>(
         &self,
         path: &Path,
         depth: usize,
-        app: Option<&AppHandle>,
+        progress_callback: Option<&F>,
         last_emit: &Arc<Mutex<Instant>>,
-    ) -> Result<FileNode, String> {
+    ) -> Result<FileNode, String>
+    where
+        F: Fn(ScanProgress) + Send + Sync,
+    {
         if self.cancel_flag.load(Ordering::Relaxed) {
             return Err("Scan cancelled by user".to_string());
         }
@@ -143,20 +145,17 @@ impl Scanner {
         self.scanned_dirs.fetch_add(1, Ordering::Relaxed);
 
         // Throttle progress events to once every 50ms
-        if let Some(app_handle) = app {
+        if let Some(cb) = progress_callback {
             if let Ok(mut last) = last_emit.try_lock() {
                 if last.elapsed() > Duration::from_millis(50) {
                     *last = Instant::now();
-                    let _ = app_handle.emit(
-                        "scan-progress",
-                        ScanProgress {
-                            scanned_files: self.scanned_files.load(Ordering::Relaxed),
-                            scanned_dirs: self.scanned_dirs.load(Ordering::Relaxed),
-                            total_size: self.total_size.load(Ordering::Relaxed),
-                            current_path: path.to_string_lossy().to_string(),
-                            is_done: false,
-                        },
-                    );
+                    cb(ScanProgress {
+                        scanned_files: self.scanned_files.load(Ordering::Relaxed),
+                        scanned_dirs: self.scanned_dirs.load(Ordering::Relaxed),
+                        total_size: self.total_size.load(Ordering::Relaxed),
+                        current_path: path.to_string_lossy().to_string(),
+                        is_done: false,
+                    });
                 }
             }
         }
@@ -206,16 +205,15 @@ impl Scanner {
         }
 
         // Rayon parallel branch traversal for subdirectories
-        // Depth threshold (e.g. depth < 6) prevents fine-grained task overhead on tiny deep leaves
         let mut child_dirs: Vec<FileNode> = if depth < 6 && child_dirs_paths.len() >= 2 {
             child_dirs_paths
                 .into_par_iter()
-                .map(|dir_path| self.scan_dir_parallel(&dir_path, depth + 1, app, last_emit))
+                .map(|dir_path| self.scan_dir_parallel(&dir_path, depth + 1, progress_callback, last_emit))
                 .collect::<Result<Vec<FileNode>, String>>()?
         } else {
             let mut dirs = Vec::with_capacity(child_dirs_paths.len());
             for dir_path in child_dirs_paths {
-                dirs.push(self.scan_dir_parallel(&dir_path, depth + 1, app, last_emit)?);
+                dirs.push(self.scan_dir_parallel(&dir_path, depth + 1, progress_callback, last_emit)?);
             }
             dirs
         };
@@ -264,7 +262,7 @@ mod tests {
 
     #[test]
     fn test_parallel_scanner() {
-        let temp_dir = std::env::temp_dir().join("disk_diff_test_scan");
+        let temp_dir = std::env::temp_dir().join("disk_diff_core_test_scan");
         let _ = fs::remove_dir_all(&temp_dir);
         fs::create_dir_all(temp_dir.join("sub1/sub2")).unwrap();
 
@@ -279,7 +277,7 @@ mod tests {
 
         let cancel_flag = Arc::new(AtomicBool::new(false));
         let scanner = Scanner::new(cancel_flag);
-        let root = scanner.scan(&temp_dir, None).unwrap();
+        let root = scanner.scan(&temp_dir, None::<&fn(ScanProgress)>).unwrap();
 
         assert_eq!(root.size, 6000);
         assert_eq!(root.file_count(), 3);
