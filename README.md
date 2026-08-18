@@ -87,24 +87,6 @@ npm run tauri build
 
 ---
 
-## 📦 自动化发布 (GitHub Actions)
-
-本项目已配置完整的 GitHub Actions CI/CD 流水线（`.github/workflows/release.yml`）。
-
-只需推送版本 Tag，云端将自动并行编译并发布：
-```bash
-git tag v0.1.0
-git push origin v0.1.0
-```
-
-GitHub Actions 会自动为以下平台构建安装包并挂载到 Release 产物中：
-- 🪟 Windows (`x86_64-pc-windows-msvc` -> `.msi`, `.exe`)
-- 🍎 macOS (`aarch64-apple-darwin` -> `.dmg`, `.app`)
-- 🐧 Linux (`x86_64-unknown-linux-gnu` -> `.deb`, `.AppImage`)
-- 🐧 Linux ARM (`aarch64-unknown-linux-gnu` -> `.deb`, `.AppImage`)
-
----
-
 ## 📄 开源许可证
 
 本项目基于 [MIT License](LICENSE) 协议开源。
