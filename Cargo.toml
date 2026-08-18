@@ -1,6 +1,12 @@
 [workspace]
 members = [
     "crates/core",
-    "src-tauri",
+    "gui/src-tauri",
 ]
 resolver = "2"
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+strip = true

@@ -54,13 +54,14 @@ jobs:
           sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libjavascriptcoregtk-4.1-dev libsoup-3.0-dev
 
       - name: Install frontend dependencies
-        run: npm ci
+        run: npm --prefix gui ci
 
       - name: Build Tauri application and release
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
+          projectPath: ./gui
           tagName: ${{ github.ref_name }}
           releaseName: 'DiskDiff ${{ github.ref_name }}'
           releaseBody: 'DiskDiff 自动编译发布版本，支持 Windows x64、macOS Apple Silicon (ARM64)、Linux x64 及 Linux ARM64。'

@@ -14,7 +14,7 @@ doctest = false
 tauri-build = { version = "2.0", features = [] }
 
 [dependencies]
-disk-diff-core = { path = "../crates/core" }
+disk-diff-core = { path = "../../crates/core" }
 tauri = { version = "2.2", features = [] }
 tauri-plugin-dialog = "2.2"
 tauri-plugin-opener = "2.2"
@@ -22,9 +22,3 @@ serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 rayon = "1.10"
 mimalloc = { version = "0.1", default-features = false }
-
-[profile.release]
-opt-level = 3
-lto = true
-codegen-units = 1
-strip = true
