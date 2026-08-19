@@ -1,6 +1,6 @@
 <div align="center">
 
-# 💽 DiskDiff
+# 💽 DiskDiff 🦀
 
 **轻量、极速的磁盘空间分析与快照增量对比工具**
 

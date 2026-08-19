@@ -1,6 +1,6 @@
 <div align="center">
 
-# 💽 DiskDiff
+# 💽 DiskDiff 🦀
 
 **A lightweight, high-performance disk space analyzer and snapshot differential tool.**
 
