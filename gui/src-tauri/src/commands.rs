@@ -243,8 +243,14 @@ pub fn get_directory_node(
 }
 
 #[tauri::command]
+pub fn get_default_storage_dir() -> Result<String, String> {
+    Ok(SnapshotManager::get_default_storage_dir().to_string_lossy().to_string())
+}
+
+#[tauri::command]
 pub async fn save_current_snapshot(
     name: String,
+    custom_dir: Option<String>,
     state: State<'_, AppState>,
 ) -> Result<String, String> {
     let snapshot_clone = {
@@ -255,7 +261,7 @@ pub async fn save_current_snapshot(
     };
 
     let target_path_str = tauri::async_runtime::spawn_blocking(move || {
-        let dir = SnapshotManager::get_default_storage_dir();
+        let dir = SnapshotManager::get_storage_dir(custom_dir.as_deref().map(Path::new));
         let target_path = dir.join(format!("{}.snap", snapshot_clone.meta.id));
         SnapshotManager::save_to_file(&snapshot_clone, &target_path)?;
         Ok::<_, String>(target_path.to_string_lossy().to_string())
@@ -290,10 +296,11 @@ pub async fn load_snapshot(
 #[tauri::command]
 pub async fn load_saved_snapshot(
     snapshot_id: String,
+    custom_dir: Option<String>,
     state: State<'_, AppState>,
 ) -> Result<ScanResultView, String> {
     let (snapshot, root_view, meta) = tauri::async_runtime::spawn_blocking(move || {
-        let dir = SnapshotManager::get_default_storage_dir();
+        let dir = SnapshotManager::get_storage_dir(custom_dir.as_deref().map(Path::new));
         let snap_path = dir.join(format!("{}.snap", snapshot_id));
         let snapshot = SnapshotManager::load_from_file(&snap_path)?;
         let root_view = to_directory_view(&snapshot.root, &snapshot.meta.root_path);
@@ -310,18 +317,22 @@ pub async fn load_saved_snapshot(
 }
 
 #[tauri::command]
-pub fn delete_saved_snapshot(snapshot_id: String) -> Result<Vec<SnapshotMeta>, String> {
-    let dir = SnapshotManager::get_default_storage_dir();
+pub fn delete_saved_snapshot(
+    snapshot_id: String,
+    custom_dir: Option<String>,
+) -> Result<Vec<SnapshotMeta>, String> {
+    let dir = SnapshotManager::get_storage_dir(custom_dir.as_deref().map(Path::new));
     let snap_path = dir.join(format!("{}.snap", snapshot_id));
     if snap_path.exists() {
         let _ = std::fs::remove_file(snap_path);
     }
-    Ok(SnapshotManager::list_saved_snapshots())
+    Ok(SnapshotManager::list_saved_snapshots(&dir))
 }
 
 #[tauri::command]
-pub fn list_saved_snapshots() -> Result<Vec<SnapshotMeta>, String> {
-    Ok(SnapshotManager::list_saved_snapshots())
+pub fn list_saved_snapshots(custom_dir: Option<String>) -> Result<Vec<SnapshotMeta>, String> {
+    let dir = SnapshotManager::get_storage_dir(custom_dir.as_deref().map(Path::new));
+    Ok(SnapshotManager::list_saved_snapshots(&dir))
 }
 
 #[tauri::command]
@@ -329,6 +340,7 @@ pub async fn diff_snapshots(
     app_handle: AppHandle,
     old_snapshot_id: String,
     new_snapshot_id: String,
+    custom_dir: Option<String>,
     state: State<'_, AppState>,
 ) -> Result<DiffResultView, String> {
     let app = app_handle.clone();
@@ -343,7 +355,7 @@ pub async fn diff_snapshots(
             },
         );
 
-        let dir = SnapshotManager::get_default_storage_dir();
+        let dir = SnapshotManager::get_storage_dir(custom_dir.as_deref().map(Path::new));
         let old_path = dir.join(format!("{}.snap", old_snapshot_id));
         let new_path = dir.join(format!("{}.snap", new_snapshot_id));
 
@@ -363,7 +375,7 @@ pub async fn diff_snapshots(
             },
         );
 
-        let diff_result = DiffEngine::diff_snapshots(&old_snap, &new_snap);
+        let diff_result = DiffEngine::diff_snapshots(&old_snap, &new_snap)?;
 
         let _ = app.emit(
             "diff-progress",
@@ -412,6 +424,7 @@ pub async fn diff_snapshots(
 pub async fn diff_current_with_saved(
     app_handle: AppHandle,
     old_snapshot_id: String,
+    custom_dir: Option<String>,
     state: State<'_, AppState>,
 ) -> Result<DiffResultView, String> {
     let app = app_handle.clone();
@@ -430,7 +443,7 @@ pub async fn diff_current_with_saved(
             },
         );
 
-        let dir = SnapshotManager::get_default_storage_dir();
+        let dir = SnapshotManager::get_storage_dir(custom_dir.as_deref().map(Path::new));
         let old_snap = SnapshotManager::load_from_file(&dir.join(format!("{}.snap", old_snapshot_id)))?;
 
         let _ = app.emit(
@@ -442,7 +455,7 @@ pub async fn diff_current_with_saved(
             },
         );
 
-        let diff_result = DiffEngine::diff_snapshots(&old_snap, &current_snap);
+        let diff_result = DiffEngine::diff_snapshots(&old_snap, &current_snap)?;
 
         let meta = DiffResultMeta {
             snapshot_a_name: diff_result.snapshot_a_name.clone(),

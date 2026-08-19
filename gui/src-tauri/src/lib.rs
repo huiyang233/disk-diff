@@ -18,6 +18,7 @@ pub fn run() {
             cancel_scan,
             get_current_snapshot_meta,
             get_directory_node,
+            get_default_storage_dir,
             save_current_snapshot,
             load_snapshot,
             load_saved_snapshot,

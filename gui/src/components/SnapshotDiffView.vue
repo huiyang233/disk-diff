@@ -14,9 +14,12 @@ import {
   CheckCircle2,
 } from 'lucide-vue-next';
 import { formatBytes, formatDelta, formatPercent, formatNumber } from '../composables/useFormat';
+import { useI18n } from '../composables/useI18n';
 import TreemapView from './TreemapView.vue';
 import ListView from './ListView.vue';
 import Breadcrumb from './Breadcrumb.vue';
+
+const { t, isZh } = useI18n();
 import type {
   ColorTheme,
   DiffDirectoryView,
@@ -92,9 +95,60 @@ watch(
   { immediate: true }
 );
 
+// Helper to normalize path (strip trailing slashes)
+function normalizePath(p?: string | null): string {
+  if (!p) return '';
+  return p.trim().replace(/[/\\]+$/, '');
+}
+
+// Automatically filter candidate baseline snapshots
+const filteredOldSnapshots = computed(() => {
+  if (compareWithCurrent.value && rustActiveSnapshot.value) {
+    return props.savedSnapshots.filter(
+      (s) =>
+        s.id !== rustActiveSnapshot.value?.id &&
+        normalizePath(s.root_path) === normalizePath(rustActiveSnapshot.value?.root_path)
+    );
+  }
+  return props.savedSnapshots;
+});
+
+// Automatically filter candidate target snapshots based on selected baseline
+const filteredNewSnapshots = computed(() => {
+  if (!selectedOldSnapshot.value) {
+    return props.savedSnapshots;
+  }
+  return props.savedSnapshots.filter(
+    (s) =>
+      s.id !== selectedOldSnapshot.value?.id &&
+      normalizePath(s.root_path) === normalizePath(selectedOldSnapshot.value?.root_path)
+  );
+});
+
+// Watch for baseline changes to auto-reset incompatible target selection
+watch(selectedOldSnapshot, (newVal) => {
+  if (selectedNewSnapshot.value) {
+    if (
+      !newVal ||
+      selectedNewSnapshot.value.id === newVal.id ||
+      normalizePath(selectedNewSnapshot.value.root_path) !== normalizePath(newVal.root_path)
+    ) {
+      selectedNewSnapshot.value = null;
+    }
+  }
+});
+
+// Watch mode switch to auto-reset incompatible baseline
+watch(compareWithCurrent, (isCurrent) => {
+  if (isCurrent && selectedOldSnapshot.value && rustActiveSnapshot.value) {
+    if (normalizePath(selectedOldSnapshot.value.root_path) !== normalizePath(rustActiveSnapshot.value.root_path)) {
+      selectedOldSnapshot.value = null;
+    }
+  }
+});
+
 // Toggle selection (Clicking selected card deselects / cancels it)
 function toggleSelectOld(snap: SnapshotMeta) {
-  if (isOldDisabled(snap)) return;
   if (selectedOldSnapshot.value?.id === snap.id) {
     selectedOldSnapshot.value = null; // Unselect / Cancel
   } else {
@@ -103,7 +157,6 @@ function toggleSelectOld(snap: SnapshotMeta) {
 }
 
 function toggleSelectNew(snap: SnapshotMeta) {
-  if (isNewDisabled(snap)) return;
   if (selectedNewSnapshot.value?.id === snap.id) {
     selectedNewSnapshot.value = null; // Unselect / Cancel
   } else {
@@ -111,28 +164,18 @@ function toggleSelectNew(snap: SnapshotMeta) {
   }
 }
 
-function isOldDisabled(snap: SnapshotMeta): boolean {
-  if (compareWithCurrent.value) {
-    return rustActiveSnapshot.value?.id === snap.id;
-  } else {
-    return selectedNewSnapshot.value?.id === snap.id;
-  }
-}
-
-function isNewDisabled(snap: SnapshotMeta): boolean {
-  return selectedOldSnapshot.value?.id === snap.id;
-}
-
-// Validation logic
+// Validation logic: require both snapshots to exist and share the identical root path
 const canStartDiff = computed(() => {
   if (!selectedOldSnapshot.value) return false;
 
   if (compareWithCurrent.value) {
     if (!rustActiveSnapshot.value) return false;
-    return selectedOldSnapshot.value.id !== rustActiveSnapshot.value.id;
+    if (selectedOldSnapshot.value.id === rustActiveSnapshot.value.id) return false;
+    return normalizePath(selectedOldSnapshot.value.root_path) === normalizePath(rustActiveSnapshot.value.root_path);
   } else {
     if (!selectedNewSnapshot.value) return false;
-    return selectedOldSnapshot.value.id !== selectedNewSnapshot.value.id;
+    if (selectedOldSnapshot.value.id === selectedNewSnapshot.value.id) return false;
+    return normalizePath(selectedOldSnapshot.value.root_path) === normalizePath(selectedNewSnapshot.value.root_path);
   }
 });
 
@@ -219,31 +262,31 @@ function handleStartDiff() {
               :class="{ active: viewMode === 'treemap' }"
               @click="emit('update:viewMode', 'treemap')"
             >
-              热力图
+              {{ t('topbar.viewTreemap') }}
             </button>
             <button
               class="toggle-btn"
               :class="{ active: viewMode === 'list' }"
               @click="emit('update:viewMode', 'list')"
             >
-              列表
+              {{ t('topbar.viewList') }}
             </button>
           </div>
 
           <!-- Color theme switch -->
           <button
             class="btn-secondary btn-sm theme-btn"
-            title="切换红绿配色模式"
+            :title="isZh ? '切换红绿配色模式' : 'Toggle Color Theme'"
             @click="emit('update:colorTheme', colorTheme === 'stock_cn' ? 'stock_us' : 'stock_cn')"
           >
             <TrendingUp :size="13" />
-            <span>{{ colorTheme === 'stock_cn' ? '红涨绿跌' : '绿涨红跌' }}</span>
+            <span>{{ colorTheme === 'stock_cn' ? (isZh ? '红涨绿跌' : 'Red Up') : (isZh ? '绿涨红跌' : 'Green Up') }}</span>
           </button>
 
           <!-- Exit diff button -->
           <button class="btn-primary btn-sm" @click="emit('exitDiff')">
             <RotateCcw :size="13" />
-            <span>退出对比</span>
+            <span>{{ isZh ? '退出对比' : 'Exit Diff' }}</span>
           </button>
         </div>
       </header>
@@ -280,17 +323,17 @@ function handleStartDiff() {
 
     <!-- 2. Setup / Card-Based Selection Workbench -->
     <div v-else class="diff-setup-wrapper">
-      <div class="setup-container">
-        <!-- Setup Header Banner -->
-        <div class="setup-banner">
-          <div class="banner-title-row">
-            <div class="banner-icon-box">
-              <GitCompare :size="18" />
-            </div>
-            <h2>磁盘快照差异对比</h2>
+      <!-- Setup Top Toolbar (Matching Snapshot Manager style) -->
+      <header class="diff-setup-toolbar">
+        <div class="toolbar-left">
+          <div class="page-title">
+            <GitCompare :size="16" class="title-icon" />
+            <h2>{{ t('diff.title') }}</h2>
           </div>
+        </div>
 
-          <!-- Mode Segmented Control (Driven directly by Rust backend state) -->
+        <div class="toolbar-right">
+          <!-- Mode Segmented Control -->
           <div class="mode-segmented-control">
             <button
               class="segment-pill"
@@ -299,8 +342,8 @@ function handleStartDiff() {
               @click="compareWithCurrent = true"
             >
               <Zap :size="13" />
-              <span>基准快照 VS 当前活动扫描</span>
-              <span v-if="!rustActiveSnapshot" class="status-tip">(无活动扫描)</span>
+              <span>{{ isZh ? '基准快照 VS 当前活动扫描' : 'Baseline VS Active Scan' }}</span>
+              <span v-if="!rustActiveSnapshot" class="status-tip">({{ isZh ? '无活动扫描' : 'No Active Scan' }})</span>
             </button>
 
             <button
@@ -309,28 +352,38 @@ function handleStartDiff() {
               @click="compareWithCurrent = false"
             >
               <Layers :size="13" />
-              <span>对比两份已存历史快照</span>
+              <span>{{ isZh ? '对比两份已存历史快照' : 'Compare Two Saved Snapshots' }}</span>
             </button>
           </div>
         </div>
+      </header>
 
-        <!-- Selection Columns (Card Grid Layout) -->
+      <div class="setup-scroll-area">
+        <div class="setup-container">
+          <!-- Selection Columns (Card Grid Layout) -->
         <div class="selection-columns" :class="{ 'two-columns': !compareWithCurrent }">
           <!-- Step 1: Base Snapshot Selection -->
           <div class="selection-column">
             <div class="column-header">
-              <span class="step-badge base">1. 基准快照 (旧版本 / 过去)</span>
-              <span class="step-subtitle">点击选择或取消选择作为对比基准的原始快照</span>
+              <div class="column-header-title">
+                <span class="step-badge base">1. {{ t('diff.baseline') }}</span>
+                <span v-if="compareWithCurrent && rustActiveSnapshot" class="constraint-pill" :title="rustActiveSnapshot.root_path">
+                  <Folder :size="10" />
+                  <span>{{ rustActiveSnapshot.root_path }}</span>
+                </span>
+              </div>
+              <span class="step-subtitle">
+                {{ compareWithCurrent && rustActiveSnapshot ? (isZh ? '仅可选择与活动扫描相同根目录的快照' : 'Only snapshots with matching root directory') : (isZh ? '点击选择作为对比基准的原始快照' : 'Click to select or unselect baseline snapshot') }}
+              </span>
             </div>
 
             <div class="cards-scroll-list">
               <div
-                v-for="snap in savedSnapshots"
+                v-for="snap in filteredOldSnapshots"
                 :key="`old_${snap.id}`"
                 class="diff-select-card"
                 :class="{
                   selected: selectedOldSnapshot?.id === snap.id,
-                  disabled: isOldDisabled(snap),
                 }"
                 @click="toggleSelectOld(snap)"
               >
@@ -342,13 +395,7 @@ function handleStartDiff() {
                   <div class="card-status-slot">
                     <span v-if="selectedOldSnapshot?.id === snap.id" class="status-badge selected-base">
                       <CheckCircle2 :size="11" />
-                      <span>已选基准</span>
-                    </span>
-                    <span v-else-if="!compareWithCurrent && selectedNewSnapshot?.id === snap.id" class="status-badge disabled-tag">
-                      已选为对比
-                    </span>
-                    <span v-else-if="compareWithCurrent && rustActiveSnapshot?.id === snap.id" class="status-badge disabled-tag">
-                      当前活动数据
+                      <span>{{ isZh ? '已选基准' : 'Selected' }}</span>
                     </span>
                   </div>
                 </div>
@@ -360,7 +407,7 @@ function handleStartDiff() {
 
                 <div class="card-stats-row">
                   <span class="stat-pill size">{{ formatBytes(snap.total_size) }}</span>
-                  <span class="stat-pill count">{{ formatNumber(snap.total_files) }} 文件</span>
+                  <span class="stat-pill count">{{ formatNumber(snap.total_files) }} {{ t('topbar.files') }}</span>
                   <span class="stat-pill date">
                     <Calendar :size="10" />
                     {{ snap.formatted_time }}
@@ -368,9 +415,9 @@ function handleStartDiff() {
                 </div>
               </div>
 
-              <div v-if="savedSnapshots.length === 0" class="empty-column-state">
+              <div v-if="filteredOldSnapshots.length === 0" class="empty-column-state">
                 <Layers :size="28" class="empty-icon" />
-                <p>暂无已保存快照，请先在「磁盘扫描」中扫描并保存快照</p>
+                <p>{{ compareWithCurrent && rustActiveSnapshot ? (isZh ? '暂无与当前活动扫描同一根目录的历史快照' : 'No saved snapshots matching active scan path') : (isZh ? '暂无已保存快照，请先在「磁盘扫描」中扫描并保存快照' : 'No saved snapshots found') }}</p>
               </div>
             </div>
           </div>
@@ -379,18 +426,25 @@ function handleStartDiff() {
           <!-- A: Two Saved Snapshots Mode -->
           <div v-if="!compareWithCurrent" class="selection-column">
             <div class="column-header">
-              <span class="step-badge compare">2. 对比快照 (新版本 / 现在)</span>
-              <span class="step-subtitle">点击选择或取消选择要与基准比对的新快照</span>
+              <div class="column-header-title">
+                <span class="step-badge compare">2. {{ t('diff.target') }}</span>
+                <span v-if="selectedOldSnapshot" class="constraint-pill" :title="selectedOldSnapshot.root_path">
+                  <Folder :size="10" />
+                  <span>{{ selectedOldSnapshot.root_path }} ({{ filteredNewSnapshots.length }})</span>
+                </span>
+              </div>
+              <span class="step-subtitle">
+                {{ selectedOldSnapshot ? (isZh ? '已自动过滤为同一根目录的历史快照' : 'Filtered to matching root directory snapshots') : (isZh ? '点击选择要与基准比对的新快照' : 'Click to select target snapshot') }}
+              </span>
             </div>
 
             <div class="cards-scroll-list">
               <div
-                v-for="snap in savedSnapshots"
+                v-for="snap in filteredNewSnapshots"
                 :key="`new_${snap.id}`"
                 class="diff-select-card"
                 :class="{
                   selected: selectedNewSnapshot?.id === snap.id,
-                  disabled: isNewDisabled(snap),
                 }"
                 @click="toggleSelectNew(snap)"
               >
@@ -402,10 +456,7 @@ function handleStartDiff() {
                   <div class="card-status-slot">
                     <span v-if="selectedNewSnapshot?.id === snap.id" class="status-badge selected-compare">
                       <CheckCircle2 :size="11" />
-                      <span>已选对比</span>
-                    </span>
-                    <span v-else-if="selectedOldSnapshot?.id === snap.id" class="status-badge disabled-tag">
-                      已选为基准
+                      <span>{{ isZh ? '已选对比' : 'Selected' }}</span>
                     </span>
                   </div>
                 </div>
@@ -417,7 +468,7 @@ function handleStartDiff() {
 
                 <div class="card-stats-row">
                   <span class="stat-pill size">{{ formatBytes(snap.total_size) }}</span>
-                  <span class="stat-pill count">{{ formatNumber(snap.total_files) }} 文件</span>
+                  <span class="stat-pill count">{{ formatNumber(snap.total_files) }} {{ t('topbar.files') }}</span>
                   <span class="stat-pill date">
                     <Calendar :size="10" />
                     {{ snap.formatted_time }}
@@ -425,9 +476,9 @@ function handleStartDiff() {
                 </div>
               </div>
 
-              <div v-if="savedSnapshots.length === 0" class="empty-column-state">
+              <div v-if="filteredNewSnapshots.length === 0" class="empty-column-state">
                 <Layers :size="28" class="empty-icon" />
-                <p>暂无已保存快照</p>
+                <p>{{ selectedOldSnapshot ? (isZh ? '该根目录下暂无其他可供对比的历史快照' : 'No other saved snapshots found for this directory') : (isZh ? '暂无已保存快照' : 'No saved snapshots') }}</p>
               </div>
             </div>
           </div>
@@ -435,15 +486,15 @@ function handleStartDiff() {
           <!-- B: Current Active Scan Preview Card -->
           <div v-else class="selection-column current-active-column">
             <div class="column-header">
-              <span class="step-badge compare">2. 对比目标 (当前内存活动数据)</span>
-              <span class="step-subtitle">直接读取 Rust 后端内存中保存的扫描数据</span>
+              <span class="step-badge compare">2. {{ isZh ? '对比目标 (当前内存活动数据)' : 'Target (Current Scan in Memory)' }}</span>
+              <span class="step-subtitle">{{ isZh ? '直接读取 Rust 后端内存中保存的扫描数据' : 'Loaded directly from Rust memory' }}</span>
             </div>
 
             <div v-if="rustActiveSnapshot" class="active-scan-preview-card">
               <div class="preview-badge-row">
                 <span class="live-pulse-badge">
                   <span class="live-dot" />
-                  Rust 后端活跃内存数据
+                  {{ isZh ? 'Rust 后端活跃内存数据' : 'Rust Backend Active Data' }}
                 </span>
                 <span class="size-highlight">{{ formatBytes(rustActiveSnapshot.total_size) }}</span>
               </div>
@@ -456,11 +507,11 @@ function handleStartDiff() {
 
               <div class="preview-metrics-grid">
                 <div class="p-item">
-                  <span class="p-label">扫描文件</span>
+                  <span class="p-label">{{ isZh ? '扫描文件' : 'Files' }}</span>
                   <span class="p-val">{{ formatNumber(rustActiveSnapshot.total_files) }}</span>
                 </div>
                 <div class="p-item">
-                  <span class="p-label">遍历目录</span>
+                  <span class="p-label">{{ isZh ? '遍历目录' : 'Dirs' }}</span>
                   <span class="p-val">{{ formatNumber(rustActiveSnapshot.total_dirs) }}</span>
                 </div>
               </div>
@@ -468,7 +519,7 @@ function handleStartDiff() {
 
             <div v-else class="empty-column-state">
               <Zap :size="28" class="empty-icon" />
-              <p>Rust 引擎当前暂无常驻扫描数据，请先扫描或选择两份历史快照进行对比</p>
+              <p>{{ isZh ? 'Rust 引擎当前暂无常驻扫描数据，请先扫描或选择两份历史快照进行对比' : 'No active scan in memory. Please scan first or pick two snapshots.' }}</p>
             </div>
           </div>
         </div>
@@ -477,7 +528,7 @@ function handleStartDiff() {
         <div class="setup-bottom-bar">
           <button class="btn-secondary" @click="emit('loadExternalSnapshot')">
             <FolderOpen :size="13" />
-            <span>打开外部 .snap 文件</span>
+            <span>{{ t('snapshots.openExternal') }}</span>
           </button>
 
           <div class="submit-group">
@@ -487,13 +538,14 @@ function handleStartDiff() {
               @click="handleStartDiff"
             >
               <GitCompare :size="14" />
-              <span>开始深度对比分析</span>
+              <span>{{ t('diff.compareNow') }}</span>
             </button>
           </div>
         </div>
       </div>
     </div>
   </div>
+</div>
 </template>
 
 <style scoped>
@@ -510,24 +562,82 @@ function handleStartDiff() {
 .diff-header-bar {
   height: 54px;
   max-height: 54px;
+  min-height: 54px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+  background: var(--bg-sidebar);
+  border-bottom: 1px solid var(--border-subtle);
+  gap: 10px;
+  box-sizing: border-box;
+  flex-shrink: 0;
+  min-width: 0;
+}
+
+/* === Setup Top Toolbar (Same as Snapshot Manager) === */
+.diff-setup-toolbar {
+  height: 54px;
+  max-height: 54px;
+  min-height: 54px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 0 18px;
   background: var(--bg-sidebar);
   border-bottom: 1px solid var(--border-subtle);
-  gap: 12px;
+  gap: 16px;
   box-sizing: border-box;
+  flex-shrink: 0;
+  min-width: 0;
+}
+
+.toolbar-left {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.page-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+}
+
+.title-icon {
+  color: var(--accent-cyan);
+  flex-shrink: 0;
+}
+
+.page-title h2 {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+}
+
+.toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .diff-info-left {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
 }
 
 .diff-icon {
   color: var(--accent-cyan);
+  flex-shrink: 0;
 }
 
 .diff-names {
@@ -536,26 +646,34 @@ function handleStartDiff() {
   gap: 6px;
   font-size: 12.5px;
   font-weight: 600;
+  min-width: 0;
+  flex: 0 1 auto;
+  overflow: hidden;
 }
 
 .old-snap-tag {
   color: var(--text-secondary);
-  max-width: 180px;
+  max-width: 360px;
+  min-width: 0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  flex-shrink: 1;
 }
 
 .new-snap-tag {
   color: var(--text-primary);
-  max-width: 180px;
+  max-width: 360px;
+  min-width: 0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  flex-shrink: 1;
 }
 
 .arrow-icon {
   color: var(--text-muted);
+  flex-shrink: 0;
 }
 
 .delta-summary-pill {
@@ -568,6 +686,16 @@ function handleStartDiff() {
   font-family: var(--font-mono);
   font-size: 11.5px;
   font-weight: 600;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.delta-size {
+  white-space: nowrap;
+}
+
+.delta-pct {
+  white-space: nowrap;
 }
 
 .text-red {
@@ -581,7 +709,9 @@ function handleStartDiff() {
 .diff-controls-right {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .view-mode-toggle {
@@ -590,6 +720,8 @@ function handleStartDiff() {
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-sm);
   padding: 2px;
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .toggle-btn {
@@ -600,6 +732,10 @@ function handleStartDiff() {
   font-size: 12px;
   border-radius: var(--radius-xs);
   cursor: pointer;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .toggle-btn.active {
@@ -611,11 +747,21 @@ function handleStartDiff() {
 .theme-btn {
   font-size: 11.5px;
   padding: 5px 10px;
+  white-space: nowrap;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
 }
 
 .btn-sm {
   padding: 5px 12px;
   font-size: 12px;
+  white-space: nowrap;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
 }
 
 .diff-content-wrapper {
@@ -629,6 +775,14 @@ function handleStartDiff() {
 /* === Card-based Setup Layout === */
 .diff-setup-wrapper {
   flex: 1;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+.setup-scroll-area {
+  flex: 1;
   overflow-y: auto;
   padding: 20px;
   display: flex;
@@ -641,48 +795,6 @@ function handleStartDiff() {
   display: flex;
   flex-direction: column;
   gap: 16px;
-}
-
-.setup-banner {
-  background: var(--bg-card);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-lg);
-  padding: 16px 20px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-}
-
-.banner-title-row {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.banner-icon-box {
-  width: 36px;
-  height: 36px;
-  border-radius: var(--radius-sm);
-  background: rgba(14, 165, 233, 0.12);
-  color: #38bdf8;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-
-.banner-title-row h2 {
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--text-primary);
-  letter-spacing: -0.01em;
-}
-
-.setup-desc {
-  font-size: 12px;
-  color: var(--text-muted);
-  margin-top: 2px;
 }
 
 .mode-segmented-control {
@@ -744,9 +856,33 @@ function handleStartDiff() {
 .column-header {
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 4px;
   padding-bottom: 10px;
   border-bottom: 1px solid var(--border-subtle);
+}
+
+.column-header-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.constraint-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 180px;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--accent-cyan);
+  background: rgba(14, 165, 233, 0.1);
+  border: 1px solid rgba(14, 165, 233, 0.25);
+  padding: 1px 7px;
+  border-radius: var(--radius-full);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .step-badge {
@@ -766,6 +902,9 @@ function handleStartDiff() {
 .step-subtitle {
   font-size: 11.5px;
   color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .cards-scroll-list {
@@ -877,6 +1016,12 @@ function handleStartDiff() {
   background: rgba(255, 255, 255, 0.05);
   color: var(--text-muted);
   border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.status-badge.mismatch-tag {
+  background: rgba(245, 158, 11, 0.12);
+  color: #fbbf24;
+  border: 1px solid rgba(245, 158, 11, 0.28);
 }
 
 .card-path-row {

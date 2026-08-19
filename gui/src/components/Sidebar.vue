@@ -1,11 +1,16 @@
 <script setup lang="ts">
+import { computed } from 'vue';
 import {
   HardDrive,
   GitCompare,
   Layers,
+  Settings,
   Info,
 } from 'lucide-vue-next';
 import type { NavTab } from '../types';
+import { useI18n } from '../composables/useI18n';
+
+const { t, isZh } = useI18n();
 
 defineProps<{
   activeTab: NavTab;
@@ -17,12 +22,13 @@ const emit = defineEmits<{
   (e: 'update:activeTab', tab: NavTab): void;
 }>();
 
-const navItems: { id: NavTab; label: string; icon: any }[] = [
-  { id: 'scan', label: '磁盘扫描', icon: HardDrive },
-  { id: 'diff', label: '快照对比', icon: GitCompare },
-  { id: 'snapshots', label: '快照管理', icon: Layers },
-  { id: 'about', label: '关于软件', icon: Info },
-];
+const navItems = computed(() => [
+  { id: 'scan' as NavTab, label: t('nav.scan'), icon: HardDrive },
+  { id: 'diff' as NavTab, label: t('nav.diff'), icon: GitCompare },
+  { id: 'snapshots' as NavTab, label: t('nav.snapshots'), icon: Layers },
+  { id: 'settings' as NavTab, label: t('nav.settings'), icon: Settings },
+  { id: 'about' as NavTab, label: t('nav.about'), icon: Info },
+]);
 </script>
 
 <template>
@@ -34,7 +40,7 @@ const navItems: { id: NavTab; label: string; icon: any }[] = [
       </div>
       <div class="brand-text">
         <span class="brand-name">DiskDiff</span>
-        <span class="brand-version">v0.1.0</span>
+        <span class="brand-version">v0.1.1</span>
       </div>
     </div>
 
@@ -70,7 +76,7 @@ const navItems: { id: NavTab; label: string; icon: any }[] = [
     <div class="sidebar-footer">
       <div class="engine-status">
         <span class="status-dot" />
-        <span>Rust 引擎运行中</span>
+        <span>Rust {{ isZh ? '引擎运行中' : 'Engine Ready' }}</span>
       </div>
     </div>
   </aside>

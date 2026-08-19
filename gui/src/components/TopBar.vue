@@ -6,10 +6,12 @@ import {
   LayoutGrid,
   ListTree,
   Save,
-  TrendingUp,
 } from 'lucide-vue-next';
 import { formatBytes, formatNumber } from '../composables/useFormat';
-import type { ColorTheme, DiffResultMeta, ScanProgress, ViewMode } from '../types';
+import { useI18n } from '../composables/useI18n';
+import type { ScanProgress, ViewMode } from '../types';
+
+const { t, isZh } = useI18n();
 
 defineProps<{
   selectedPath: string;
@@ -17,9 +19,6 @@ defineProps<{
   scanProgress: ScanProgress | null;
   hasScanData: boolean;
   viewMode: ViewMode;
-  isDiffMode: boolean;
-  diffResult: DiffResultMeta | null;
-  colorTheme: ColorTheme;
 }>();
 
 const emit = defineEmits<{
@@ -28,8 +27,6 @@ const emit = defineEmits<{
   (e: 'cancelScan'): void;
   (e: 'saveSnapshot'): void;
   (e: 'update:viewMode', mode: ViewMode): void;
-  (e: 'update:colorTheme', theme: ColorTheme): void;
-  (e: 'exitDiffMode'): void;
 }>();
 </script>
 
@@ -41,7 +38,7 @@ const emit = defineEmits<{
         <input
           :value="selectedPath"
           type="text"
-          placeholder="请选择要扫描分析的目录路径..."
+          :placeholder="t('topbar.selectFolder')"
           class="path-input"
           readonly
           @click="emit('pickDirectory')"
@@ -49,11 +46,11 @@ const emit = defineEmits<{
         <button
           class="btn-secondary pick-btn"
           :disabled="isScanning"
-          title="选择本地文件夹"
+          :title="t('topbar.browse')"
           @click="emit('pickDirectory')"
         >
           <FolderSearch :size="14" />
-          <span>选择目录</span>
+          <span>{{ t('topbar.browse') }}</span>
         </button>
       </div>
 
@@ -65,7 +62,7 @@ const emit = defineEmits<{
         @click="emit('startScan')"
       >
         <Play :size="14" />
-        <span>开始扫描</span>
+        <span>{{ t('topbar.startScan') }}</span>
       </button>
       <button
         v-else
@@ -73,14 +70,14 @@ const emit = defineEmits<{
         @click="emit('cancelScan')"
       >
         <Square :size="13" />
-        <span>取消扫描</span>
+        <span>{{ t('topbar.cancelScan') }}</span>
       </button>
     </div>
 
     <!-- Center: Live Progress Bar (when scanning) -->
     <div v-if="isScanning && scanProgress" class="center-progress">
       <div class="progress-info">
-        <span class="progress-files">已扫描: {{ formatNumber(scanProgress.scanned_files) }} 文件</span>
+        <span class="progress-files">{{ isZh ? '已扫描' : 'Scanned' }}: {{ formatNumber(scanProgress.scanned_files) }} {{ t('topbar.files') }}</span>
         <span class="progress-size">{{ formatBytes(scanProgress.total_size) }}</span>
       </div>
       <div class="progress-path" :title="scanProgress.current_path">
@@ -92,13 +89,13 @@ const emit = defineEmits<{
     <div class="right-section">
       <!-- Save Snapshot Button (Enabled when scan data is loaded) -->
       <button
-        v-if="hasScanData && !isDiffMode"
+        v-if="hasScanData"
         class="btn-secondary save-btn"
-        title="将当前扫描结果保存为本地快照文件"
+        :title="t('topbar.saveSnapshot')"
         @click="emit('saveSnapshot')"
       >
         <Save :size="14" />
-        <span>保存快照</span>
+        <span>{{ t('topbar.saveSnapshot') }}</span>
       </button>
 
       <!-- View Switcher -->
@@ -106,36 +103,22 @@ const emit = defineEmits<{
         <button
           class="view-btn"
           :class="{ active: viewMode === 'treemap' }"
-          title="股市风格矩形树图 (Treemap)"
+          :title="t('topbar.viewTreemap')"
           @click="emit('update:viewMode', 'treemap')"
         >
           <LayoutGrid :size="14" />
-          <span>热力图</span>
+          <span>{{ t('topbar.viewTreemap') }}</span>
         </button>
         <button
           class="view-btn"
           :class="{ active: viewMode === 'list' }"
-          title="树状层级列表 (List Table)"
+          :title="t('topbar.viewList')"
           @click="emit('update:viewMode', 'list')"
         >
           <ListTree :size="14" />
-          <span>列表</span>
+          <span>{{ t('topbar.viewList') }}</span>
         </button>
       </div>
-
-      <!-- Color Theme Toggle (for Diff Mode) -->
-      <button
-        v-if="isDiffMode"
-        class="theme-toggle-btn"
-        :title="colorTheme === 'stock_cn' ? '当前配色: 红涨绿跌 (点击切换为绿涨红跌)' : '当前配色: 绿涨红跌 (点击切换为红涨绿跌)'"
-        @click="emit('update:colorTheme', colorTheme === 'stock_cn' ? 'stock_us' : 'stock_cn')"
-      >
-        <TrendingUp
-          :size="13"
-          :class="colorTheme === 'stock_cn' ? 'theme-icon-red' : 'theme-icon-green'"
-        />
-        <span>{{ colorTheme === 'stock_cn' ? '红涨绿跌' : '绿涨红跌' }}</span>
-      </button>
     </div>
   </header>
 </template>
@@ -144,32 +127,40 @@ const emit = defineEmits<{
 .topbar-container {
   height: 54px;
   max-height: 54px;
+  min-height: 54px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 18px;
+  padding: 0 16px;
   background: var(--bg-sidebar);
   border-bottom: 1px solid var(--border-subtle);
-  gap: 16px;
+  gap: 12px;
   z-index: 10;
   box-sizing: border-box;
+  flex-shrink: 0;
+  min-width: 0;
 }
 
 .left-section {
   display: flex;
   align-items: center;
-  gap: 10px;
-  flex-shrink: 0;
+  gap: 8px;
+  min-width: 0;
+  flex: 1 1 auto;
 }
 
 .path-picker-group {
   display: flex;
   align-items: center;
   gap: 6px;
+  min-width: 0;
+  flex: 1 1 auto;
+  max-width: 380px;
 }
 
 .path-input {
-  width: 280px;
+  width: 100%;
+  min-width: 100px;
   cursor: pointer;
   white-space: nowrap;
   overflow: hidden;
@@ -183,6 +174,8 @@ const emit = defineEmits<{
   gap: 6px;
   font-size: 12px;
   padding: 6px 12px;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .center-progress {
@@ -191,6 +184,7 @@ const emit = defineEmits<{
   flex-direction: column;
   align-items: center;
   max-width: 340px;
+  min-width: 0;
 }
 
 .progress-info {
@@ -199,6 +193,7 @@ const emit = defineEmits<{
   font-size: 12px;
   font-weight: 600;
   color: var(--accent-cyan);
+  white-space: nowrap;
 }
 
 .progress-path {
@@ -214,8 +209,9 @@ const emit = defineEmits<{
 .right-section {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .save-btn {
@@ -224,6 +220,8 @@ const emit = defineEmits<{
   gap: 5px;
   font-size: 12px;
   padding: 5px 10px;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .view-switch-group {
@@ -232,6 +230,8 @@ const emit = defineEmits<{
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-sm);
   padding: 2px;
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .view-btn {
@@ -243,6 +243,8 @@ const emit = defineEmits<{
   display: inline-flex;
   align-items: center;
   gap: 5px;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .view-btn:hover {
@@ -264,6 +266,8 @@ const emit = defineEmits<{
   display: inline-flex;
   align-items: center;
   gap: 4px;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .theme-toggle-btn:hover {

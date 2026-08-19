@@ -12,7 +12,10 @@ import {
   Loader2,
 } from 'lucide-vue-next';
 import { formatBytes, formatNumber } from '../composables/useFormat';
+import { useI18n } from '../composables/useI18n';
 import type { SnapshotMeta } from '../types';
+
+const { t, isZh } = useI18n();
 
 const props = defineProps<{
   savedSnapshots: SnapshotMeta[];
@@ -44,7 +47,10 @@ const filteredSnapshots = computed(() => {
 });
 
 function handleDelete(snap: SnapshotMeta) {
-  if (confirm(`确定要删除快照「${snap.name}」吗？此操作不可恢复。`)) {
+  const confirmMsg = isZh.value
+    ? `确定要删除快照「${snap.name}」吗？此操作不可恢复。`
+    : `Are you sure you want to delete snapshot "${snap.name}"? This cannot be undone.`;
+  if (confirm(confirmMsg)) {
     emit('deleteSnapshot', snap.id);
   }
 }
@@ -57,8 +63,8 @@ function handleDelete(snap: SnapshotMeta) {
       <div class="toolbar-left">
         <div class="page-title">
           <Layers :size="16" class="title-icon" />
-          <h2>快照管理</h2>
-          <span class="count-pill">{{ savedSnapshots.length }} 份快照</span>
+          <h2>{{ t('snapshots.title') }}</h2>
+          <span class="count-pill">{{ savedSnapshots.length }} {{ isZh ? '份快照' : 'Snapshots' }}</span>
         </div>
       </div>
 
@@ -69,7 +75,7 @@ function handleDelete(snap: SnapshotMeta) {
           <input
             v-model="searchQuery"
             type="text"
-            placeholder="搜索快照名称、路径、日期..."
+            :placeholder="isZh ? '搜索快照名称、路径、日期...' : 'Search name, path, date...'"
             class="search-input"
           />
         </div>
@@ -78,22 +84,22 @@ function handleDelete(snap: SnapshotMeta) {
         <button
           v-if="currentSnapshotMeta"
           class="btn-primary btn-sm"
-          title="将当前已完成的扫描保存为快照"
+          :title="isZh ? '将当前已完成的扫描保存为快照' : 'Save active scan as snapshot'"
           @click="emit('saveCurrentSnapshot')"
         >
           <Save :size="13" />
-          <span>保存当前快照</span>
+          <span>{{ isZh ? '保存当前快照' : 'Save Active Snapshot' }}</span>
         </button>
 
         <button
           class="btn-secondary btn-sm"
           :disabled="isLoadingExternal"
-          title="从磁盘载入外部 .snap 文件"
+          :title="t('snapshots.openExternal')"
           @click="emit('loadExternalSnapshot')"
         >
           <Loader2 v-if="isLoadingExternal" :size="13" class="btn-spin" />
           <FolderOpen v-else :size="13" />
-          <span>{{ isLoadingExternal ? '载入中...' : '打开外部快照' }}</span>
+          <span>{{ isLoadingExternal ? t('snapshots.loading') : t('snapshots.openExternal') }}</span>
         </button>
       </div>
     </header>
@@ -118,7 +124,7 @@ function handleDelete(snap: SnapshotMeta) {
             </div>
             <button
               class="btn-icon-danger"
-              title="删除此快照"
+              :title="t('snapshots.delete')"
               @click="handleDelete(snap)"
             >
               <Trash2 :size="14" />
@@ -134,17 +140,17 @@ function handleDelete(snap: SnapshotMeta) {
           <!-- 3-Metrics Grid -->
           <div class="card-metrics-grid">
             <div class="metric-item">
-              <span class="metric-label">扫描容量</span>
+              <span class="metric-label">{{ isZh ? '扫描容量' : 'Total Size' }}</span>
               <span class="metric-val size-val">{{ formatBytes(snap.total_size) }}</span>
             </div>
             <div class="metric-item">
-              <span class="metric-label">文件 / 目录</span>
+              <span class="metric-label">{{ isZh ? '文件 / 目录' : 'Files / Dirs' }}</span>
               <span class="metric-val counts-val">
                 {{ formatNumber(snap.total_files) }} / {{ formatNumber(snap.total_dirs) }}
               </span>
             </div>
             <div class="metric-item">
-              <span class="metric-label">快照体积</span>
+              <span class="metric-label">{{ t('snapshots.snapSize') }}</span>
               <span class="metric-val snap-val">
                 {{ snap.snap_file_size ? formatBytes(snap.snap_file_size) : '-' }}
               </span>
@@ -162,20 +168,20 @@ function handleDelete(snap: SnapshotMeta) {
               <button
                 class="btn-primary btn-xs action-btn"
                 :disabled="loadingSnapshotId === snap.id"
-                title="在主工作台中浏览"
+                :title="t('snapshots.browse')"
                 @click="emit('openSnapshot', snap)"
               >
                 <Loader2 v-if="loadingSnapshotId === snap.id" :size="12" class="btn-spin" />
                 <FolderOpen v-else :size="12" />
-                <span>{{ loadingSnapshotId === snap.id ? '载入中...' : '浏览' }}</span>
+                <span>{{ loadingSnapshotId === snap.id ? t('snapshots.loading') : t('snapshots.browse') }}</span>
               </button>
               <button
                 class="btn-secondary btn-xs action-btn"
-                title="以此快照为基准发起对比"
+                :title="isZh ? '以此快照为基准发起对比' : 'Diff with this snapshot'"
                 @click="emit('diffWithSnapshot', snap)"
               >
                 <GitCompare :size="12" />
-                <span>对比</span>
+                <span>{{ isZh ? '对比' : 'Diff' }}</span>
               </button>
             </div>
           </div>
@@ -187,14 +193,14 @@ function handleDelete(snap: SnapshotMeta) {
         <div class="empty-icon-wrap">
           <Layers :size="32" class="empty-icon" />
         </div>
-        <h3>暂无磁盘快照数据</h3>
+        <h3>{{ t('snapshots.emptyTitle') }}</h3>
         <p class="empty-desc">
-          在「磁盘扫描」中扫描任意目录后，点击「保存快照」，快照将以高压缩率保存至本地。
+          {{ t('snapshots.emptyDesc') }}
         </p>
         <div class="empty-actions">
           <button class="btn-primary" @click="emit('loadExternalSnapshot')">
             <FolderOpen :size="13" />
-            <span>导入外部快照文件 (.snap)</span>
+            <span>{{ t('snapshots.openExternal') }}</span>
           </button>
         </div>
       </div>

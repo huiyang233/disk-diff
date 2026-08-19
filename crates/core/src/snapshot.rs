@@ -21,6 +21,16 @@ impl SnapshotManager {
         PathBuf::from("snapshots")
     }
 
+    pub fn get_storage_dir(custom_path: Option<&Path>) -> PathBuf {
+        if let Some(path) = custom_path {
+            if !path.as_os_str().is_empty() {
+                let _ = fs::create_dir_all(path);
+                return path.to_path_buf();
+            }
+        }
+        Self::get_default_storage_dir()
+    }
+
     pub fn create_snapshot(root: FileNode, root_path: String, name_opt: Option<String>) -> Snapshot {
         let now = Local::now();
         let timestamp = now.timestamp();
@@ -46,12 +56,15 @@ impl SnapshotManager {
     }
 
     /// Save snapshot into high-compression binary format with instant header metadata
+    ///
     /// File Format:
-    /// - [0..8] Magic: "DISKDIFF"
-    /// - [8] Version: 1 (u8)
-    /// - [9..13] Header length: u32 (little endian)
-    /// - [13..13+header_len] SnapshotMeta (JSON bytes)
-    /// - [13+header_len..] Zstd level 9 compressed Bincode of FileNode (Root tree)
+    /// ```text
+    /// [0..8] Magic: "DISKDIFF"
+    /// [8] Version: 1 (u8)
+    /// [9..13] Header length: u32 (little endian)
+    /// [13..13+header_len] SnapshotMeta (JSON bytes)
+    /// [13+header_len..] Zstd level 9 compressed Bincode of FileNode (Root tree)
+    /// ```
     pub fn save_to_file(snapshot: &Snapshot, target_path: &Path) -> Result<(), String> {
         if let Some(parent) = target_path.parent() {
             let _ = fs::create_dir_all(parent);
@@ -165,12 +178,11 @@ impl SnapshotManager {
         Ok(Snapshot { meta, root })
     }
 
-    /// List all saved snapshots by reading ONLY the fast binary headers (< 1ms!)
-    pub fn list_saved_snapshots() -> Vec<SnapshotMeta> {
-        let dir = Self::get_default_storage_dir();
+    /// List all saved snapshots in a given directory by reading ONLY the fast binary headers (< 1ms!)
+    pub fn list_saved_snapshots(storage_dir: &Path) -> Vec<SnapshotMeta> {
         let mut results = Vec::new();
 
-        if let Ok(entries) = fs::read_dir(dir) {
+        if let Ok(entries) = fs::read_dir(storage_dir) {
             for entry in entries.flatten() {
                 let path = entry.path();
                 if path.extension().and_then(|s| s.to_str()) == Some("snap") {

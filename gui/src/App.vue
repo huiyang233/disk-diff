@@ -3,7 +3,7 @@ import { ref, shallowRef, computed, onMounted, onUnmounted } from 'vue';
 import { invoke } from '@tauri-apps/api/core';
 import { listen, type UnlistenFn } from '@tauri-apps/api/event';
 import { open } from '@tauri-apps/plugin-dialog';
-import { HardDrive, FolderOpen, Play, Square } from 'lucide-vue-next';
+import { HardDrive, FolderOpen, Play, Square, Sparkles } from 'lucide-vue-next';
 
 import Sidebar from './components/Sidebar.vue';
 import TopBar from './components/TopBar.vue';
@@ -13,11 +13,26 @@ import ListView from './components/ListView.vue';
 import SaveSnapshotModal from './components/SaveSnapshotModal.vue';
 import SnapshotManagerView from './components/SnapshotManagerView.vue';
 import SnapshotDiffView from './components/SnapshotDiffView.vue';
+import SettingsView from './components/SettingsView.vue';
 import AboutView from './components/AboutView.vue';
 import { formatBytes, formatNumber } from './composables/useFormat';
+import { useI18n } from './composables/useI18n';
+import { useSettings } from './composables/useSettings';
+
+const { t, isZh } = useI18n();
+const { customStorageDir, colorTheme, initSettings } = useSettings();
+
+const appToastMsg = ref('');
+let appToastTimer: ReturnType<typeof setTimeout> | null = null;
+function showAppToast(msg: string) {
+  appToastMsg.value = msg;
+  if (appToastTimer) clearTimeout(appToastTimer);
+  appToastTimer = setTimeout(() => {
+    appToastMsg.value = '';
+  }, 3000);
+}
 
 import type {
-  ColorTheme,
   DiffDirectoryView,
   DiffItemView,
   DiffProgress,
@@ -35,49 +50,65 @@ import type {
 // Sidebar navigation
 const activeNavTab = ref<NavTab>('scan');
 
-// Scan State
+// ==========================================
+// 1. Scan Tab State (磁盘空间扫描独立状态)
+// ==========================================
 const selectedPath = ref('');
 const isScanning = ref(false);
 const scanProgress = ref<ScanProgress | null>(null);
+const scanMeta = shallowRef<SnapshotMeta | null>(null);
+const scanDirView = shallowRef<DirectoryView | null>(null);
+const scanViewMode = ref<ViewMode>('treemap');
 
-// Diff State
+interface NavTrailItem {
+  name: string;
+  path: string;
+}
+const scanNavTrail = shallowRef<NavTrailItem[]>([]);
+
+const scanBreadcrumbSegments = computed(() => {
+  return scanNavTrail.value.map((item) => ({
+    name: item.name || 'Root',
+    fullPath: item.path,
+  }));
+});
+
+// ==========================================
+// 2. Diff Tab State (快照差异对比独立状态)
+// ==========================================
 const isDiffing = ref(false);
 const diffProgress = ref<DiffProgress | null>(null);
-
-// Shallow state for current view and metadata (Rust backend retains full deep tree in memory)
-const currentMeta = shallowRef<SnapshotMeta | null>(null);
-const currentDirView = shallowRef<DirectoryView | DiffDirectoryView | null>(null);
 const diffMeta = shallowRef<DiffResultMeta | null>(null);
-const isDiffMode = ref(false);
+const diffDirView = shallowRef<DiffDirectoryView | null>(null);
+const diffViewMode = ref<ViewMode>('treemap');
+const diffNavTrail = shallowRef<NavTrailItem[]>([]);
+const diffPreselectedOld = ref<SnapshotMeta | null>(null);
 
-const viewMode = ref<ViewMode>('treemap');
-const colorTheme = ref<ColorTheme>('stock_cn');
+const isDiffActive = computed(() => !!diffMeta.value && !!diffDirView.value);
+
+const diffBreadcrumbSegments = computed(() => {
+  return diffNavTrail.value.map((item) => ({
+    name: item.name || 'Root',
+    fullPath: item.path,
+  }));
+});
+
+// ==========================================
+// 3. Shared & Manager State
+// ==========================================
 const savedSnapshots = ref<SnapshotMeta[]>([]);
 const saveSnapshotModalVisible = ref(false);
 const isSavingSnapshot = ref(false);
 const loadingSnapshotId = ref<string | null>(null);
 const isLoadingExternal = ref(false);
-const diffPreselectedOld = ref<SnapshotMeta | null>(null);
-
-// Navigation trail for scan explorer
-interface NavTrailItem {
-  name: string;
-  path: string;
-}
-const navTrail = shallowRef<NavTrailItem[]>([]);
-
-const breadcrumbSegments = computed(() => {
-  return navTrail.value.map((item) => ({
-    name: item.name || 'Root',
-    fullPath: item.path,
-  }));
-});
 
 let unlistenProgress: UnlistenFn | null = null;
 let unlistenDiffProgress: UnlistenFn | null = null;
 
 onMounted(async () => {
   try {
+    await initSettings();
+
     // Listen to streaming scan progress
     unlistenProgress = await listen<ScanProgress>('scan-progress', (event) => {
       scanProgress.value = event.payload;
@@ -112,12 +143,18 @@ onUnmounted(() => {
 
 async function refreshSavedSnapshots() {
   try {
-    const list = await invoke<SnapshotMeta[]>('list_saved_snapshots');
+    const list = await invoke<SnapshotMeta[]>('list_saved_snapshots', {
+      customDir: customStorageDir.value || undefined,
+    });
     savedSnapshots.value = list;
   } catch (err) {
     console.error('Failed to list saved snapshots:', err);
   }
 }
+
+// ==========================================
+// Scan Tab Handlers
+// ==========================================
 
 // Directory Picker
 async function handlePickDirectory() {
@@ -125,7 +162,7 @@ async function handlePickDirectory() {
     const selected = await open({
       directory: true,
       multiple: false,
-      title: '选择要扫描分析的文件夹',
+      title: isZh.value ? '选择要扫描分析的文件夹' : 'Select Folder to Scan',
     });
 
     if (selected && typeof selected === 'string') {
@@ -142,23 +179,21 @@ async function handleStartScan() {
 
   isScanning.value = true;
   scanProgress.value = null;
-  isDiffMode.value = false;
-  diffMeta.value = null;
-  currentDirView.value = null;
-  navTrail.value = [];
+  scanDirView.value = null;
+  scanNavTrail.value = [];
   activeNavTab.value = 'scan';
 
   try {
     const res = await invoke<ScanResultView>('start_scan', {
       path: selectedPath.value,
     });
-    currentMeta.value = res.meta;
-    currentDirView.value = res.root_view;
-    navTrail.value = [{ name: res.root_view.name || 'Root', path: res.root_view.path }];
+    scanMeta.value = res.meta;
+    scanDirView.value = res.root_view;
+    scanNavTrail.value = [{ name: res.root_view.name || 'Root', path: res.root_view.path }];
     await refreshSavedSnapshots();
   } catch (err: any) {
     if (err !== 'Scan cancelled by user') {
-      alert(`扫描出错: ${err}`);
+      showAppToast(`${isZh.value ? '扫描出错' : 'Scan failed'}: ${err}`);
     }
   } finally {
     isScanning.value = false;
@@ -175,49 +210,92 @@ async function handleCancelScan() {
   }
 }
 
+// Drill-Down in Scan Tab
+async function handleScanDrillDown(item: FileItemView) {
+  try {
+    const nextView = await invoke<DirectoryView>('get_directory_node', {
+      path: item.path,
+    });
+    scanDirView.value = nextView;
+    scanNavTrail.value = [...scanNavTrail.value, { name: item.name, path: item.path }];
+  } catch (err) {
+    console.error('Failed to load subfolder:', err);
+  }
+}
+
+// Breadcrumb Navigate in Scan Tab
+async function handleScanNavigate(index: number) {
+  const target = scanNavTrail.value[index];
+  if (!target) return;
+
+  try {
+    const nextView = await invoke<DirectoryView>('get_directory_node', {
+      path: target.path,
+    });
+    scanDirView.value = nextView;
+    scanNavTrail.value = scanNavTrail.value.slice(0, index + 1);
+  } catch (err) {
+    console.error('Failed to navigate:', err);
+  }
+}
+
+// Go Back in Scan Tab
+function handleScanBack() {
+  if (scanNavTrail.value.length > 1) {
+    handleScanNavigate(scanNavTrail.value.length - 2);
+  }
+}
+
+// Return to Welcome Screen in Scan Tab
+function handleScanHome() {
+  scanMeta.value = null;
+  scanDirView.value = null;
+  scanNavTrail.value = [];
+  selectedPath.value = '';
+}
+
 // Save Snapshot
 async function handleSaveSnapshot(customName: string) {
-  if (!currentMeta.value || isSavingSnapshot.value) return;
+  if (!scanMeta.value || isSavingSnapshot.value) return;
 
   isSavingSnapshot.value = true;
   try {
-    // Yield 1 micro-tick so browser repaints and runs the spinner immediately
     await new Promise((resolve) => setTimeout(resolve, 50));
 
-    const savedPath = await invoke<string>('save_current_snapshot', {
+    await invoke<string>('save_current_snapshot', {
       name: customName,
+      customDir: customStorageDir.value || undefined,
     });
     await refreshSavedSnapshots();
     saveSnapshotModalVisible.value = false;
-    alert(`快照保存成功！\n保存路径: ${savedPath}`);
+    showAppToast(isZh.value ? `快照已成功保存` : `Snapshot saved successfully!`);
   } catch (err) {
-    alert(`保存快照失败: ${err}`);
+    showAppToast(`${isZh.value ? '保存快照失败' : 'Failed to save snapshot'}: ${err}`);
   } finally {
     isSavingSnapshot.value = false;
   }
 }
 
-// Load Saved Snapshot by ID
+// Load Saved Snapshot by ID into Scan Tab
 async function handleOpenSavedSnapshot(snapMeta: SnapshotMeta) {
   if (loadingSnapshotId.value) return;
   loadingSnapshotId.value = snapMeta.id;
   try {
-    // Yield 1 micro-tick to let browser render the spinner
     await new Promise((resolve) => setTimeout(resolve, 50));
 
     const res = await invoke<ScanResultView>('load_saved_snapshot', {
       snapshotId: snapMeta.id,
+      customDir: customStorageDir.value || undefined,
     });
-    currentMeta.value = res.meta;
-    currentDirView.value = res.root_view;
+    scanMeta.value = res.meta;
+    scanDirView.value = res.root_view;
     selectedPath.value = res.root_view.path;
-    isDiffMode.value = false;
-    diffMeta.value = null;
-    navTrail.value = [{ name: res.root_view.name || 'Root', path: res.root_view.path }];
+    scanNavTrail.value = [{ name: res.root_view.name || 'Root', path: res.root_view.path }];
     saveSnapshotModalVisible.value = false;
     activeNavTab.value = 'scan';
+    showAppToast(isZh.value ? `已载入快照: ${snapMeta.name}` : `Loaded snapshot: ${snapMeta.name}`);
   } catch (err) {
-    alert(`打开快照失败: ${err}`);
+    showAppToast(`${isZh.value ? '打开快照失败' : 'Failed to open snapshot'}: ${err}`);
   } finally {
     loadingSnapshotId.value = null;
   }
@@ -228,14 +306,16 @@ async function handleDeleteSnapshot(snapshotId: string) {
   try {
     const updatedList = await invoke<SnapshotMeta[]>('delete_saved_snapshot', {
       snapshotId,
+      customDir: customStorageDir.value || undefined,
     });
     savedSnapshots.value = updatedList;
+    showAppToast(isZh.value ? '已成功删除快照' : 'Snapshot deleted');
   } catch (err) {
-    alert(`删除快照失败: ${err}`);
+    showAppToast(`${isZh.value ? '删除快照失败' : 'Failed to delete snapshot'}: ${err}`);
   }
 }
 
-// Load Snapshot File (.snap)
+// Load Snapshot File (.snap) into Scan Tab
 async function handleLoadSnapshotFile() {
   if (isLoadingExternal.value) return;
   try {
@@ -243,7 +323,7 @@ async function handleLoadSnapshotFile() {
       directory: false,
       multiple: false,
       filters: [{ name: 'Snapshot File', extensions: ['snap'] }],
-      title: '打开磁盘快照文件',
+      title: isZh.value ? '打开磁盘快照文件' : 'Open Snapshot File',
     });
 
     if (selected && typeof selected === 'string') {
@@ -252,21 +332,24 @@ async function handleLoadSnapshotFile() {
       const res = await invoke<ScanResultView>('load_snapshot', {
         filePath: selected,
       });
-      currentMeta.value = res.meta;
-      currentDirView.value = res.root_view;
+      scanMeta.value = res.meta;
+      scanDirView.value = res.root_view;
       selectedPath.value = res.root_view.path;
-      isDiffMode.value = false;
-      diffMeta.value = null;
-      navTrail.value = [{ name: res.root_view.name || 'Root', path: res.root_view.path }];
+      scanNavTrail.value = [{ name: res.root_view.name || 'Root', path: res.root_view.path }];
       saveSnapshotModalVisible.value = false;
       activeNavTab.value = 'scan';
+      showAppToast(isZh.value ? `已载入外部快照文件` : `Loaded external snapshot file`);
     }
   } catch (err) {
-    alert(`加载快照失败: ${err}`);
+    showAppToast(`${isZh.value ? '加载快照失败' : 'Failed to load snapshot'}: ${err}`);
   } finally {
     isLoadingExternal.value = false;
   }
 }
+
+// ==========================================
+// Diff Tab Handlers
+// ==========================================
 
 // Run Diff
 async function handleDiffSnapshots(
@@ -276,26 +359,27 @@ async function handleDiffSnapshots(
   try {
     isDiffing.value = true;
     diffProgress.value = {
-      stage: '正在启动深度对比引擎...',
+      stage: isZh.value ? '正在启动深度对比引擎...' : 'Initializing differential engine...',
       progress_percent: 5,
       is_done: false,
     };
 
-    // Yield control to let Vue render the loading card immediately
     await new Promise((resolve) => setTimeout(resolve, 50));
 
     let res: DiffResultView;
 
-    if (!newMeta && currentMeta.value) {
+    if (!newMeta && scanMeta.value) {
       // Diff current active scan in memory with saved snapshot
       res = await invoke<DiffResultView>('diff_current_with_saved', {
         oldSnapshotId: oldMeta.id,
+        customDir: customStorageDir.value || undefined,
       });
     } else if (oldMeta && newMeta) {
       // Diff two saved snapshots
       res = await invoke<DiffResultView>('diff_snapshots', {
         oldSnapshotId: oldMeta.id,
         newSnapshotId: newMeta.id,
+        customDir: customStorageDir.value || undefined,
       });
     } else {
       isDiffing.value = false;
@@ -303,13 +387,11 @@ async function handleDiffSnapshots(
     }
 
     diffMeta.value = res.meta;
-    currentDirView.value = res.root_view;
-    isDiffMode.value = true;
-    navTrail.value = [{ name: res.root_view.name || 'Root', path: res.root_view.path }];
-    saveSnapshotModalVisible.value = false;
+    diffDirView.value = res.root_view;
+    diffNavTrail.value = [{ name: res.root_view.name || 'Root', path: res.root_view.path }];
     activeNavTab.value = 'diff';
   } catch (err) {
-    alert(`对比分析失败: ${err}`);
+    showAppToast(`${isZh.value ? '对比分析失败' : 'Differential analysis failed'}: ${err}`);
   } finally {
     isDiffing.value = false;
     diffProgress.value = null;
@@ -322,86 +404,50 @@ function handleDiffWithSnapshot(snap: SnapshotMeta) {
   activeNavTab.value = 'diff';
 }
 
-// Exit Diff Mode
-async function exitDiffMode() {
-  isDiffMode.value = false;
-  diffMeta.value = null;
-  if (currentMeta.value) {
-    try {
-      const root = await invoke<DirectoryView>('get_directory_node', {
-        path: currentMeta.value.root_path,
-      });
-      currentDirView.value = root;
-      navTrail.value = [{ name: root.name || 'Root', path: root.path }];
-    } catch {
-      handleGoHome();
-    }
-  } else {
-    handleGoHome();
-  }
-}
-
-// Drill-Down into Folder (On-Demand load from Rust backend)
-async function handleDrillDown(item: FileItemView | DiffItemView) {
+// Drill-Down in Diff Tab
+async function handleDiffDrillDown(item: DiffItemView) {
   try {
-    if (isDiffMode.value) {
-      const nextView = await invoke<DiffDirectoryView>('get_diff_directory_node', {
-        path: item.path,
-      });
-      currentDirView.value = nextView;
-    } else {
-      const nextView = await invoke<DirectoryView>('get_directory_node', {
-        path: item.path,
-      });
-      currentDirView.value = nextView;
-    }
-    navTrail.value = [...navTrail.value, { name: item.name, path: item.path }];
+    const nextView = await invoke<DiffDirectoryView>('get_diff_directory_node', {
+      path: item.path,
+    });
+    diffDirView.value = nextView;
+    diffNavTrail.value = [...diffNavTrail.value, { name: item.name, path: item.path }];
   } catch (err) {
-    console.error('Failed to load subfolder:', err);
+    console.error('Failed to load diff subfolder:', err);
   }
 }
 
-// Navigate via Breadcrumb
-async function handleNavigate(index: number) {
-  const target = navTrail.value[index];
+// Breadcrumb Navigate in Diff Tab
+async function handleDiffNavigate(index: number) {
+  const target = diffNavTrail.value[index];
   if (!target) return;
 
   try {
-    if (isDiffMode.value) {
-      const nextView = await invoke<DiffDirectoryView>('get_diff_directory_node', {
-        path: target.path,
-      });
-      currentDirView.value = nextView;
-    } else {
-      const nextView = await invoke<DirectoryView>('get_directory_node', {
-        path: target.path,
-      });
-      currentDirView.value = nextView;
-    }
-    navTrail.value = navTrail.value.slice(0, index + 1);
+    const nextView = await invoke<DiffDirectoryView>('get_diff_directory_node', {
+      path: target.path,
+    });
+    diffDirView.value = nextView;
+    diffNavTrail.value = diffNavTrail.value.slice(0, index + 1);
   } catch (err) {
-    console.error('Failed to navigate:', err);
+    console.error('Failed to navigate diff:', err);
   }
 }
 
-// Go Back 1 Level
-function handleBack() {
-  if (navTrail.value.length > 1) {
-    handleNavigate(navTrail.value.length - 2);
+// Go Back in Diff Tab
+function handleDiffBack() {
+  if (diffNavTrail.value.length > 1) {
+    handleDiffNavigate(diffNavTrail.value.length - 2);
   }
 }
 
-// Return to Welcome / Home Screen
-function handleGoHome() {
-  currentMeta.value = null;
+// Exit Diff Mode (Returns Diff Tab to Workbench)
+function exitDiffMode() {
   diffMeta.value = null;
-  currentDirView.value = null;
-  isDiffMode.value = false;
-  navTrail.value = [];
-  selectedPath.value = '';
+  diffDirView.value = null;
+  diffNavTrail.value = [];
 }
 
-// Reveal in Finder / File Manager
+// Reveal in Finder
 async function handleRevealInFinder(path: string) {
   try {
     await invoke('reveal_in_finder', { path });
@@ -423,49 +469,44 @@ async function handleRevealInFinder(path: string) {
 
     <!-- Main Workspace Area -->
     <div class="workspace-area">
-      <!-- 1. Disk Scan Tab -->
+      <!-- 1. Disk Scan Tab (磁盘空间扫描 - 纯净扫描模式) -->
       <template v-if="activeNavTab === 'scan'">
         <!-- TopBar only visible when viewing scan results -->
         <TopBar
-          v-if="currentDirView"
+          v-if="scanDirView"
           :selected-path="selectedPath"
           :is-scanning="isScanning"
           :scan-progress="scanProgress"
-          :has-scan-data="!!currentDirView"
-          :view-mode="viewMode"
-          :is-diff-mode="isDiffMode"
-          :diff-result="diffMeta as any"
-          :color-theme="colorTheme"
+          :has-scan-data="!!scanDirView"
+          :view-mode="scanViewMode"
           @pick-directory="handlePickDirectory"
           @start-scan="handleStartScan"
           @cancel-scan="handleCancelScan"
           @save-snapshot="saveSnapshotModalVisible = true"
-          @update:view-mode="viewMode = $event"
-          @update:color-theme="colorTheme = $event"
-          @exit-diff-mode="exitDiffMode"
+          @update:view-mode="scanViewMode = $event"
         />
 
         <!-- Breadcrumb Hierarchy Navigation -->
         <Breadcrumb
-          v-if="breadcrumbSegments.length > 0 && currentDirView"
-          :segments="breadcrumbSegments"
-          :can-go-back="navTrail.length > 1"
-          @navigate="handleNavigate"
-          @back="handleBack"
-          @home="handleGoHome"
+          v-if="scanBreadcrumbSegments.length > 0 && scanDirView"
+          :segments="scanBreadcrumbSegments"
+          :can-go-back="scanNavTrail.length > 1"
+          @navigate="handleScanNavigate"
+          @back="handleScanBack"
+          @home="handleScanHome"
         />
 
         <!-- Main Scan Content Area -->
         <main class="main-content">
           <!-- Loading / Scanning Active Dashboard -->
-          <div v-if="isScanning && !currentDirView" class="center-state">
+          <div v-if="isScanning && !scanDirView" class="center-state">
             <div class="scanning-card glass-panel">
               <div class="scanning-header">
                 <div class="spinner" />
                 <div class="scanning-title-box">
-                  <h3>正在高速多线程扫描目录...</h3>
+                  <h3>{{ isZh ? '正在高速多线程扫描目录...' : 'Multi-threaded disk scanning in progress...' }}</h3>
                   <div class="scan-target-path" :title="selectedPath">
-                    目标目录: <span>{{ selectedPath }}</span>
+                    {{ isZh ? '目标目录' : 'Target' }}: <span>{{ selectedPath }}</span>
                   </div>
                 </div>
               </div>
@@ -478,19 +519,19 @@ async function handleRevealInFinder(path: string) {
               <!-- Metrics 3-card grid -->
               <div class="scan-metrics-grid">
                 <div class="metric-card">
-                  <span class="metric-label">累计容量</span>
+                  <span class="metric-label">{{ isZh ? '累计容量' : 'Total Size' }}</span>
                   <span class="metric-value highlight">
                     {{ scanProgress ? formatBytes(scanProgress.total_size) : '0 B' }}
                   </span>
                 </div>
                 <div class="metric-card">
-                  <span class="metric-label">已发现文件</span>
+                  <span class="metric-label">{{ isZh ? '已发现文件' : 'Files Found' }}</span>
                   <span class="metric-value">
                     {{ scanProgress ? formatNumber(scanProgress.scanned_files) : '0' }}
                   </span>
                 </div>
                 <div class="metric-card">
-                  <span class="metric-label">已遍历文件夹</span>
+                  <span class="metric-label">{{ isZh ? '已遍历文件夹' : 'Dirs Traversed' }}</span>
                   <span class="metric-value">
                     {{ scanProgress ? formatNumber(scanProgress.scanned_dirs) : '0' }}
                   </span>
@@ -499,7 +540,7 @@ async function handleRevealInFinder(path: string) {
 
               <!-- Live Scanning File/Subdirectory Path -->
               <div class="live-scanning-path-box">
-                <span class="live-tag">正在扫描:</span>
+                <span class="live-tag">{{ isZh ? '正在扫描:' : 'Scanning:' }}</span>
                 <span class="live-subpath" :title="scanProgress?.current_path || selectedPath">
                   {{ scanProgress?.current_path || selectedPath }}
                 </span>
@@ -509,28 +550,28 @@ async function handleRevealInFinder(path: string) {
               <div class="scan-action-row">
                 <button class="btn-danger cancel-scan-btn" @click="handleCancelScan">
                   <Square :size="13" />
-                  <span>取消扫描</span>
+                  <span>{{ t('topbar.cancelScan') }}</span>
                 </button>
               </div>
             </div>
           </div>
 
-          <!-- Treemap View Mode -->
+          <!-- Treemap View Mode (Pure Scan Mode: isDiffMode is strictly false) -->
           <TreemapView
-            v-else-if="viewMode === 'treemap' && currentDirView"
-            :current-node="currentDirView"
-            :is-diff-mode="isDiffMode"
+            v-else-if="scanViewMode === 'treemap' && scanDirView"
+            :current-node="scanDirView"
+            :is-diff-mode="false"
             :color-theme="colorTheme"
-            @drill-down="handleDrillDown"
+            @drill-down="handleScanDrillDown as any"
             @reveal-in-finder="handleRevealInFinder"
           />
 
-          <!-- List View Mode -->
+          <!-- List View Mode (Pure Scan Mode: isDiffMode is strictly false) -->
           <ListView
-            v-else-if="viewMode === 'list' && currentDirView"
-            :current-node="currentDirView"
-            :is-diff-mode="isDiffMode"
-            @drill-down="handleDrillDown"
+            v-else-if="scanViewMode === 'list' && scanDirView"
+            :current-node="scanDirView"
+            :is-diff-mode="false"
+            @drill-down="handleScanDrillDown as any"
             @reveal-in-finder="handleRevealInFinder"
           />
 
@@ -540,9 +581,9 @@ async function handleRevealInFinder(path: string) {
               <div class="welcome-icon-glow">
                 <HardDrive :size="36" class="welcome-icon" />
               </div>
-              <h2>选择要扫描分析的文件夹</h2>
+              <h2>{{ isZh ? '选择要扫描分析的文件夹' : 'Select a Directory to Analyze' }}</h2>
               <p class="welcome-desc">
-                多线程并发遍历，通过矩形树图可视化分析磁盘容量分布与大文件占比
+                {{ isZh ? '多线程并发遍历，通过矩形树图可视化分析磁盘容量分布与大文件占比' : 'High-throughput parallel scanner with intuitive stock-style treemap visualization' }}
               </p>
 
               <!-- Central Directory Selector Zone -->
@@ -552,10 +593,10 @@ async function handleRevealInFinder(path: string) {
                 </div>
                 <div class="zone-text">
                   <span v-if="selectedPath" class="path-selected" :title="selectedPath">{{ selectedPath }}</span>
-                  <span v-else class="path-placeholder">点击选择电脑上的任意文件夹或磁盘路径...</span>
+                  <span v-else class="path-placeholder">{{ isZh ? '点击选择电脑上的任意文件夹或磁盘路径...' : 'Click to choose any folder or disk volume...' }}</span>
                 </div>
                 <button class="btn-secondary btn-sm browse-btn" @click.stop="handlePickDirectory">
-                  浏览...
+                  {{ isZh ? '浏览...' : 'Browse...' }}
                 </button>
               </div>
 
@@ -567,7 +608,7 @@ async function handleRevealInFinder(path: string) {
                   @click="handleStartScan"
                 >
                   <Play :size="16" />
-                  <span>开始高速扫描</span>
+                  <span>{{ isZh ? '开始高速扫描' : 'Start Fast Scan' }}</span>
                 </button>
               </div>
             </div>
@@ -575,38 +616,38 @@ async function handleRevealInFinder(path: string) {
         </main>
       </template>
 
-      <!-- 2. Snapshot Diff Tab -->
+      <!-- 2. Snapshot Diff Tab (快照差异对比 - 专属对比模式) -->
       <template v-else-if="activeNavTab === 'diff'">
         <SnapshotDiffView
           :saved-snapshots="savedSnapshots"
-          :current-snapshot-meta="currentMeta"
-          :is-diff-mode="isDiffMode"
+          :current-snapshot-meta="scanMeta"
+          :is-diff-mode="isDiffActive"
           :is-diffing="isDiffing"
           :diff-progress="diffProgress"
           :diff-meta="diffMeta"
-          :current-dir-view="currentDirView as any"
-          :breadcrumb-segments="breadcrumbSegments"
-          :can-go-back="navTrail.length > 1"
-          :view-mode="viewMode"
+          :current-dir-view="diffDirView as any"
+          :breadcrumb-segments="diffBreadcrumbSegments"
+          :can-go-back="diffNavTrail.length > 1"
+          :view-mode="diffViewMode"
           :color-theme="colorTheme"
           :preselected-snapshot="diffPreselectedOld"
           @run-diff="handleDiffSnapshots"
           @load-external-snapshot="handleLoadSnapshotFile"
           @exit-diff="exitDiffMode"
-          @drill-down="handleDrillDown as any"
-          @navigate="handleNavigate"
-          @back="handleBack"
+          @drill-down="handleDiffDrillDown as any"
+          @navigate="handleDiffNavigate"
+          @back="handleDiffBack"
           @reveal-in-finder="handleRevealInFinder"
-          @update:view-mode="viewMode = $event"
+          @update:view-mode="diffViewMode = $event"
           @update:color-theme="colorTheme = $event"
         />
       </template>
 
-      <!-- 3. Snapshot Manager Tab -->
+      <!-- 3. Snapshot Manager Tab (快照历史管理) -->
       <template v-else-if="activeNavTab === 'snapshots'">
         <SnapshotManagerView
           :saved-snapshots="savedSnapshots"
-          :current-snapshot-meta="currentMeta"
+          :current-snapshot-meta="scanMeta"
           :loading-snapshot-id="loadingSnapshotId"
           :is-loading-external="isLoadingExternal"
           @open-snapshot="handleOpenSavedSnapshot"
@@ -618,16 +659,30 @@ async function handleRevealInFinder(path: string) {
         />
       </template>
 
-      <!-- 4. About Tab -->
+      <!-- 4. Settings Tab (偏好设置) -->
+      <template v-else-if="activeNavTab === 'settings'">
+        <SettingsView />
+      </template>
+
+      <!-- 5. About Tab (关于软件) -->
       <template v-else-if="activeNavTab === 'about'">
         <AboutView />
       </template>
     </div>
 
+    <!-- Global Toast Notification -->
+    <transition name="toast-fade">
+      <div v-if="appToastMsg" class="global-toast">
+        <Sparkles :size="14" />
+        <span>{{ appToastMsg }}</span>
+      </div>
+    </transition>
+
     <!-- Dedicated Save Snapshot Modal -->
     <SaveSnapshotModal
+      v-if="saveSnapshotModalVisible"
       :visible="saveSnapshotModalVisible"
-      :current-snapshot-meta="currentMeta"
+      :current-snapshot-meta="scanMeta"
       :is-saving="isSavingSnapshot"
       @close="saveSnapshotModalVisible = false"
       @save="handleSaveSnapshot"
@@ -945,6 +1000,35 @@ async function handleRevealInFinder(path: string) {
   justify-content: center;
   gap: 7px;
   letter-spacing: -0.01em;
+}
+
+/* Global Floating Toast */
+.global-toast {
+  position: fixed;
+  top: 20px;
+  right: 24px;
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 16px;
+  background: var(--accent-emerald);
+  color: #0b0e14;
+  font-size: 12.5px;
+  font-weight: 600;
+  border-radius: var(--radius-md);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+}
+
+.toast-fade-enter-active,
+.toast-fade-leave-active {
+  transition: all 0.2s ease;
+}
+
+.toast-fade-enter-from,
+.toast-fade-leave-to {
+  opacity: 0;
+  transform: translateY(-8px);
 }
 </style>
 

@@ -6,7 +6,16 @@ use crate::model::{DiffNode, DiffResult, DiffStatus, FileNode, Snapshot};
 pub struct DiffEngine;
 
 impl DiffEngine {
-    pub fn diff_snapshots(old_snap: &Snapshot, new_snap: &Snapshot) -> DiffResult {
+    pub fn diff_snapshots(old_snap: &Snapshot, new_snap: &Snapshot) -> Result<DiffResult, String> {
+        let clean_old = old_snap.meta.root_path.trim_end_matches(['/', '\\']);
+        let clean_new = new_snap.meta.root_path.trim_end_matches(['/', '\\']);
+        if clean_old != clean_new {
+            return Err(format!(
+                "无法对比不同根目录的快照：基准路径为 \"{}\"，对比目标路径为 \"{}\"",
+                old_snap.meta.root_path, new_snap.meta.root_path
+            ));
+        }
+
         let root_diff = Self::diff_nodes(&old_snap.root, &new_snap.root);
         let old_total_size = old_snap.meta.total_size;
         let new_total_size = new_snap.meta.total_size;
@@ -19,7 +28,7 @@ impl DiffEngine {
             0.0
         };
 
-        DiffResult {
+        Ok(DiffResult {
             snapshot_a_name: old_snap.meta.name.clone(),
             snapshot_a_time: old_snap.meta.formatted_time.clone(),
             snapshot_b_name: new_snap.meta.name.clone(),
@@ -30,7 +39,7 @@ impl DiffEngine {
             delta_total_size,
             delta_total_percent,
             root: root_diff,
-        }
+        })
     }
 
     pub fn diff_nodes(old_node: &FileNode, new_node: &FileNode) -> DiffNode {

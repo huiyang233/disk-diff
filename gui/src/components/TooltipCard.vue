@@ -2,7 +2,10 @@
 import { computed } from 'vue';
 import { Folder, FileText, ArrowUpRight, ArrowDownRight, Minus, Sparkles, Trash2 } from 'lucide-vue-next';
 import { formatBytes, formatDelta, formatPercent, formatNumber } from '../composables/useFormat';
+import { useI18n } from '../composables/useI18n';
 import type { DiffStatus } from '../types';
+
+const { isZh } = useI18n();
 
 const props = defineProps<{
   visible: boolean;
@@ -55,19 +58,19 @@ const positionStyle = computed(() => {
     <div class="metrics-grid">
       <!-- Current Size -->
       <div class="metric-item">
-        <span class="label">当前容量:</span>
+        <span class="label">{{ isZh ? '当前容量:' : 'Size:' }}</span>
         <span class="value size-value">{{ formatBytes(size) }}</span>
       </div>
 
       <!-- Diff specific metrics -->
       <template v-if="isDiffMode">
         <div v-if="oldSize !== undefined && oldSize !== null" class="metric-item">
-          <span class="label">原容量:</span>
+          <span class="label">{{ isZh ? '原容量:' : 'Old Size:' }}</span>
           <span class="value">{{ formatBytes(oldSize) }}</span>
         </div>
 
         <div v-if="deltaSize !== undefined" class="metric-item">
-          <span class="label">容量变动:</span>
+          <span class="label">{{ isZh ? '容量变动:' : 'Delta Size:' }}</span>
           <span
             class="value delta-value"
             :class="{
@@ -84,7 +87,7 @@ const positionStyle = computed(() => {
         </div>
 
         <div v-if="deltaPercent !== undefined" class="metric-item">
-          <span class="label">变动幅度:</span>
+          <span class="label">{{ isZh ? '变动幅度:' : 'Delta %:' }}</span>
           <span
             class="badge"
             :class="{
@@ -98,7 +101,7 @@ const positionStyle = computed(() => {
         </div>
 
         <div v-if="status" class="metric-item">
-          <span class="label">状态:</span>
+          <span class="label">{{ isZh ? '状态:' : 'Status:' }}</span>
           <span
             class="status-tag"
             :class="`status-${status}`"
@@ -107,12 +110,12 @@ const positionStyle = computed(() => {
             <Trash2 v-else-if="status === 'removed'" :size="11" />
             {{
               status === 'added'
-                ? '新增'
+                ? (isZh ? '新增' : 'Added')
                 : status === 'removed'
-                ? '已删除'
+                ? (isZh ? '已删除' : 'Removed')
                 : status === 'modified'
-                ? '容量变更'
-                : '未变化'
+                ? (isZh ? '容量变更' : 'Modified')
+                : (isZh ? '未变化' : 'Unchanged')
             }}
           </span>
         </div>
@@ -121,11 +124,11 @@ const positionStyle = computed(() => {
       <!-- Non-diff file count -->
       <template v-else-if="isDir">
         <div v-if="fileCount !== undefined" class="metric-item">
-          <span class="label">文件总数:</span>
+          <span class="label">{{ isZh ? '文件总数:' : 'Files:' }}</span>
           <span class="value">{{ formatNumber(fileCount) }}</span>
         </div>
         <div v-if="dirCount !== undefined" class="metric-item">
-          <span class="label">子文件夹:</span>
+          <span class="label">{{ isZh ? '子文件夹:' : 'Subdirectories:' }}</span>
           <span class="value">{{ formatNumber(dirCount) }}</span>
         </div>
       </template>

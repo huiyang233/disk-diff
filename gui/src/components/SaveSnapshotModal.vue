@@ -1,11 +1,14 @@
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue';
+import { ref, computed, watch, onMounted } from 'vue';
 import { X, Save, HardDrive, FileText, AlertCircle, Loader2 } from 'lucide-vue-next';
 import { formatBytes, formatNumber } from '../composables/useFormat';
+import { useI18n } from '../composables/useI18n';
 import type { SnapshotMeta } from '../types';
 
+const { t, isZh } = useI18n();
+
 const props = defineProps<{
-  visible: boolean;
+  visible?: boolean;
   currentSnapshotMeta: SnapshotMeta | null;
   isSaving?: boolean;
 }>();
@@ -18,18 +21,32 @@ const emit = defineEmits<{
 const snapshotName = ref('');
 const touched = ref(false);
 
+function initName() {
+  if (props.currentSnapshotMeta) {
+    snapshotName.value = `${props.currentSnapshotMeta.name}_${isZh.value ? '快照' : 'snapshot'}`;
+    touched.value = false;
+  }
+}
+
+onMounted(() => {
+  initName();
+});
+
 watch(
-  () => props.visible,
-  (val) => {
-    if (val && props.currentSnapshotMeta) {
-      snapshotName.value = `${props.currentSnapshotMeta.name}_快照`;
-      touched.value = false;
-    }
+  () => props.currentSnapshotMeta,
+  () => {
+    initName();
   },
   { immediate: true }
 );
 
 const isNameValid = computed(() => snapshotName.value.trim().length > 0);
+
+function handleClose() {
+  if (!props.isSaving) {
+    emit('close');
+  }
+}
 
 function handleSave() {
   touched.value = true;
@@ -39,15 +56,15 @@ function handleSave() {
 </script>
 
 <template>
-  <div v-if="visible" class="modal-backdrop" @click.self="!isSaving && emit('close')">
+  <div class="modal-backdrop" @click.self="handleClose">
     <div class="modal-window glass-panel">
       <!-- Header -->
       <div class="modal-header">
         <div class="header-title-row">
           <Save :size="18" class="header-icon" />
-          <h3>保存当前磁盘快照</h3>
+          <h3>{{ t('saveModal.title') }}</h3>
         </div>
-        <button class="close-btn" :disabled="isSaving" @click="emit('close')">
+        <button class="close-btn" :disabled="isSaving" @click="handleClose">
           <X :size="16" />
         </button>
       </div>
@@ -64,14 +81,14 @@ function handleSave() {
             <div class="p-item">
               <span class="p-label">
                 <HardDrive :size="13" />
-                扫描总容量:
+                {{ t('topbar.totalSize') }}:
               </span>
               <span class="p-val highlight">{{ formatBytes(currentSnapshotMeta.total_size) }}</span>
             </div>
             <div class="p-item">
               <span class="p-label">
                 <FileText :size="13" />
-                文件总数:
+                {{ isZh ? '文件总数' : 'Total Files' }}:
               </span>
               <span class="p-val">{{ formatNumber(currentSnapshotMeta.total_files) }}</span>
             </div>
@@ -81,10 +98,10 @@ function handleSave() {
         <!-- Name Input (Required) -->
         <div class="form-group">
           <label class="form-label">
-            <span>快照名称 <span class="required-star">*</span></span>
+            <span>{{ t('saveModal.nameLabel') }} <span class="required-star">*</span></span>
             <span v-if="touched && !isNameValid" class="error-hint">
               <AlertCircle :size="12" />
-              快照名称不能为空
+              {{ isZh ? '快照名称不能为空' : 'Snapshot name cannot be empty' }}
             </span>
           </label>
           <input
@@ -93,7 +110,7 @@ function handleSave() {
             class="form-input"
             :class="{ 'input-error': touched && !isNameValid }"
             :disabled="isSaving"
-            placeholder="请输入快照名称，如: 2026年8月项目备份"
+            :placeholder="t('saveModal.namePlaceholder')"
             autofocus
             @blur="touched = true"
             @keydown.enter="handleSave"
@@ -104,11 +121,11 @@ function handleSave() {
         <div class="actions-row">
           <div v-if="isSaving" class="saving-hint-row">
             <Loader2 :size="12" class="btn-spin" />
-            <span>Zstd 压缩写入中...</span>
+            <span>{{ t('saveModal.saving') }}</span>
           </div>
 
-          <button class="btn-secondary" :disabled="isSaving" @click="emit('close')">
-            取消
+          <button class="btn-secondary" :disabled="isSaving" @click="handleClose">
+            {{ t('saveModal.cancelBtn') }}
           </button>
           <button
             class="btn-primary save-action-btn"
@@ -117,7 +134,7 @@ function handleSave() {
           >
             <Loader2 v-if="isSaving" :size="14" class="btn-spin" />
             <Save v-else :size="14" />
-            <span>{{ isSaving ? '正在高速压缩保存...' : '立即保存快照 (.snap)' }}</span>
+            <span>{{ isSaving ? (isZh ? '正在高速压缩保存...' : 'Compressing...') : t('saveModal.saveBtn') }}</span>
           </button>
         </div>
       </div>

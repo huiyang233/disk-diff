@@ -4,7 +4,10 @@ import * as d3 from 'd3-hierarchy';
 import { Folder, FileText, ExternalLink, ArrowRight, Layers } from 'lucide-vue-next';
 import { formatBytes, formatPercent } from '../composables/useFormat';
 import { getDiffColor, getScanColor } from '../composables/useColor';
+import { useI18n } from '../composables/useI18n';
 import TooltipCard from './TooltipCard.vue';
+
+const { t, isZh } = useI18n();
 import type {
   ColorTheme,
   DiffDirectoryView,
@@ -285,8 +288,8 @@ function handleMouseEnter(item: TreemapItem, event: MouseEvent) {
       visible: true,
       x: event.clientX,
       y: event.clientY,
-      name: `其他 ${item.otherCount} 个较小文件/目录`,
-      path: '超出展示限制的较小文件汇总',
+      name: isZh.value ? `其他 ${item.otherCount} 个较小文件/目录` : `${item.otherCount} other smaller items`,
+      path: isZh.value ? '超出展示限制的较小文件汇总' : 'Aggregated small files',
       isDir: true,
       size: item.size,
       oldSize: null,
@@ -328,15 +331,13 @@ function handleMouseLeave() {
 }
 
 function handleClick(item: TreemapItem) {
-  if (item.isOtherGroup) return;
-  if (item.isDir && item.originalNode) {
+  if (item.isDir && !item.isOtherGroup && item.originalNode) {
     tooltip.value.visible = false;
     emit('drillDown', item.originalNode);
   }
 }
 
 function handleContextMenu(item: TreemapItem, event: MouseEvent) {
-  if (item.isOtherGroup) return;
   event.preventDefault();
   contextMenu.value = {
     visible: true,
@@ -442,21 +443,21 @@ function drillDownFromMenu(item: TreemapItem | null) {
       <!-- Empty state when no children -->
       <div v-if="layoutItems.length === 0" class="empty-state">
         <Folder :size="48" class="empty-icon" />
-        <p class="empty-text">当前目录下没有子文件或文件夹</p>
+        <p class="empty-text">{{ t('treemap.empty') }}</p>
       </div>
     </div>
 
     <!-- Legend bar at bottom for Diff Mode -->
     <div v-if="isDiffMode" class="heatmap-legend glass-panel">
       <span class="legend-desc">
-        当前层级面积代表文件占比；颜色深浅代表增减幅度：
+        {{ isZh ? '颜色深浅代表容量增减幅度：' : 'Color indicates capacity delta %:' }}
       </span>
       <div class="legend-scale">
-        <span class="scale-step red-deep">+100% 暴增</span>
-        <span class="scale-step red-mid">+20% 增加</span>
-        <span class="scale-step gray">0% 未变</span>
-        <span class="scale-step green-mid">-20% 缩减</span>
-        <span class="scale-step green-deep">-100% 骤减</span>
+        <span class="scale-step red-deep">{{ isZh ? '+100% 暴增' : '+100% Gain' }}</span>
+        <span class="scale-step red-mid">{{ isZh ? '+20% 增加' : '+20% Up' }}</span>
+        <span class="scale-step gray">{{ isZh ? '0% 未变' : '0% Same' }}</span>
+        <span class="scale-step green-mid">{{ isZh ? '-20% 缩减' : '-20% Down' }}</span>
+        <span class="scale-step green-deep">{{ isZh ? '-100% 骤减' : '-100% Gone' }}</span>
       </div>
     </div>
 
@@ -490,11 +491,11 @@ function drillDownFromMenu(item: TreemapItem | null) {
         @click="drillDownFromMenu(contextMenu.item)"
       >
         <ArrowRight :size="14" />
-        <span>进入该文件夹</span>
+        <span>{{ isZh ? '进入该文件夹' : 'Drill down folder' }}</span>
       </div>
       <div class="menu-item" @click="openInFinder(contextMenu.item)">
         <ExternalLink :size="14" />
-        <span>在访达/资源管理器中显示</span>
+        <span>{{ t('list.reveal') }}</span>
       </div>
     </div>
   </div>
@@ -675,29 +676,43 @@ function drillDownFromMenu(item: TreemapItem | null) {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 16px;
-  padding: 8px 16px;
+  gap: 14px;
+  padding: 6px 16px;
   border-top: 1px solid var(--border-subtle);
-  font-size: 12px;
+  font-size: 11.5px;
   background: var(--bg-sidebar);
+  white-space: nowrap;
+  flex-shrink: 0;
+  min-height: 36px;
+  box-sizing: border-box;
+  overflow-x: auto;
 }
 
 .legend-desc {
   color: var(--text-secondary);
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .legend-scale {
   display: flex;
   align-items: center;
   gap: 6px;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .scale-step {
-  padding: 2px 8px;
+  padding: 2px 7px;
   border-radius: var(--radius-sm);
   font-family: var(--font-mono);
   font-size: 11px;
   font-weight: 600;
+  white-space: nowrap;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .scale-step.red-deep {

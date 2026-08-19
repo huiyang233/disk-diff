@@ -10,7 +10,7 @@ export interface SnapshotMeta {
   snap_file_size?: number;
 }
 
-export type NavTab = 'scan' | 'diff' | 'snapshots' | 'about';
+export type NavTab = 'scan' | 'diff' | 'snapshots' | 'settings' | 'about';
 
 export type DiffStatus = 'added' | 'removed' | 'modified' | 'unchanged';
 

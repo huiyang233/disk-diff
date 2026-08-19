@@ -1,6 +1,6 @@
 [package]
 name = "disk-diff"
-version = "0.1.0"
+version = "0.1.1"
 description = "High performance disk space analyzer and snapshot diff tool"
 authors = ["Antigravity"]
 edition = "2021"

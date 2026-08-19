@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { computed } from 'vue';
 import {
   HardDrive,
   Search,
@@ -6,24 +7,33 @@ import {
   ShieldCheck,
   Heart,
 } from 'lucide-vue-next';
+import { useI18n } from '../composables/useI18n';
 
-const useCases = [
+const { t, isZh } = useI18n();
+
+const useCases = computed(() => [
   {
     icon: Search,
-    title: '揪出偷偷膨胀的缓存与日志',
-    desc: '日常开发中 node_modules、构建缓存、Docker 镜像或应用日志经常莫名其妙变大，拍两个快照比对一下，哪儿暴涨了一目了然。',
+    title: isZh.value ? '揪出偷偷膨胀的缓存与日志' : 'Identify Bloated Caches & Logs',
+    desc: isZh.value
+      ? '日常开发中 node_modules、构建缓存、Docker 镜像或应用日志经常莫名其妙变大，拍两个快照比对一下，哪儿暴涨了一目了然。'
+      : 'Quickly detect runaway log files, cache directories, node_modules, or container images growing unexpectedly over time.',
   },
   {
     icon: Sparkles,
-    title: '大扫除前后留底比对',
-    desc: '在清理大文件或卸载软件前后各存一份快照，不仅能直观确认到底释放了多少空间，还能防止误删了重要目录。',
+    title: isZh.value ? '大扫除前后留底比对' : 'Before & After Cleanup Verification',
+    desc: isZh.value
+      ? '在清理大文件或卸载软件前后各存一份快照，不仅能直观确认到底释放了多少空间，还能防止误删了重要目录。'
+      : 'Capture snapshots before and after cleaning disks or uninstalling heavy software to verify exact space reclaimed.',
   },
   {
     icon: ShieldCheck,
-    title: '纯粹本地运行，不搞花里胡哨',
-    desc: '所有扫描和快照数据 100% 留在自己电脑本地，零多余网络请求，不做多余无用的功能，专注把磁盘对比这一件事做好。',
+    title: isZh.value ? '纯粹本地运行，隐私无忧' : '100% Local & Privacy-Respecting',
+    desc: isZh.value
+      ? '所有扫描和快照数据 100% 留在自己电脑本地，零多余网络请求，不做多余无用的功能，专注把磁盘对比这一件事做好。'
+      : 'All scanning and snapshot files remain strictly on your local disk with zero telemetry, background tracking, or network requests.',
   },
-];
+]);
 </script>
 
 <template>
@@ -37,9 +47,9 @@ const useCases = [
         <div class="header-info">
           <div class="title-row">
             <h1>DiskDiff</h1>
-            <span class="version-tag">v0.1.0</span>
+            <span class="version-tag">v0.1.1</span>
           </div>
-          <p class="subtitle">因为自己有磁盘对比需求而写的实用小工具</p>
+          <p class="subtitle">{{ isZh ? '因为自己有磁盘对比需求而写的实用小工具' : 'A high-performance disk space analyzer & snapshot differential tool' }}</p>
         </div>
       </div>
 
@@ -49,13 +59,16 @@ const useCases = [
       <div class="story-section">
         <div class="section-title-row">
           <Heart :size="15" class="story-icon" />
-          <h3>为什么写这个软件？</h3>
+          <h3>{{ isZh ? '为什么写这个软件？' : 'Why was this built?' }}</h3>
         </div>
         <p class="story-p">
-          平时电脑用着用着磁盘经常告急。虽然市面上有很多优秀的磁盘清理和分析软件，但它们大多只能看<strong>「当前哪个文件夹最大」</strong>，却很难回答<strong>「从上周到今天，到底是什么东西在偷偷变大」</strong>。
+          {{ t('about.story1') }}
         </p>
         <p class="story-p">
-          一些传统对比工具又太复杂、缺少直观的下钻热力图。所以干脆用 Rust 和 Vue 给自己搓了一个小轮子：快速给文件夹拍个快照，隔段时间拉出来比对，哪里涨了、哪里删了以股市热力图直接呈现，简单直接。
+          {{ t('about.story2') }}
+        </p>
+        <p class="story-p">
+          {{ t('about.story3') }}
         </p>
       </div>
 
@@ -63,7 +76,7 @@ const useCases = [
 
       <!-- Typical Use Cases -->
       <div class="usecase-section">
-        <h3>平时主要用来干嘛？</h3>
+        <h3>{{ isZh ? '平时主要用来干嘛？' : 'Common Use Cases' }}</h3>
         <div class="usecase-grid">
           <div
             v-for="item in useCases"
@@ -85,7 +98,7 @@ const useCases = [
 
       <!-- Tech Stack Badges -->
       <div class="tech-section">
-        <span class="tech-label">主要技术：</span>
+        <span class="tech-label">{{ isZh ? '主要技术：' : 'Built with:' }}</span>
         <div class="badges-row">
           <span class="tech-badge">Tauri 2.0</span>
           <span class="tech-badge">Rust (Rayon + Mimalloc)</span>
