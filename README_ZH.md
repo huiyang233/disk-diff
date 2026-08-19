@@ -76,6 +76,14 @@ DiskDiff 原生支持全主流操作系统与架构：
 - **Windows**：Windows 10 / 11 (`x86_64`)
 - **Linux**：Ubuntu / Debian / Arch (`x86_64` & `arm64`)
 
+> [!TIP]
+> **macOS 首次安装提示「已损坏，无法打开」解决办法**：
+> 由于本项目为个人开源项目，未购买苹果年费开发者证书签名与公证，macOS Gatekeeper 可能会在从浏览器下载后拦截并提示损坏。
+> 解决非常简单，只需在终端中执行一行命令即可解除隔离：
+> ```bash
+> xattr -cr /Applications/DiskDiff.app
+> ```
+
 ---
 
 ## 🛠️ 本地开发与构建

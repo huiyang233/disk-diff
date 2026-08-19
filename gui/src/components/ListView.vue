@@ -209,7 +209,6 @@ function getItemRatio(item: ItemType): number {
                   >
                     {{ item.name }}
                   </span>
-                  <span v-if="item.is_dir" class="dir-badge">{{ t('list.dirBadge') }}</span>
                 </div>
               </div>
             </td>

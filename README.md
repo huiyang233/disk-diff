@@ -76,6 +76,14 @@ DiskDiff natively supports major desktop operating systems and architectures:
 - **Windows**: Windows 10 / 11 (`x86_64`)
 - **Linux**: Ubuntu / Debian / Arch (`x86_64` & `arm64`)
 
+> [!TIP]
+> **macOS Security Notice (App is damaged error)**:
+> Since DiskDiff is an open-source project without a paid Apple Developer certificate, macOS Gatekeeper may show *"DiskDiff.app is damaged and cannot be opened"* upon initial download.
+> You can easily resolve this by running the following command in Terminal:
+> ```bash
+> xattr -cr /Applications/DiskDiff.app
+> ```
+
 ---
 
 ## 🛠️ Development & Build Guide
