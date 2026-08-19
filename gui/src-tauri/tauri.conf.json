@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "DiskDiff - 磁盘容量分析与快照对比",
+        "title": "DiskDiff",
         "width": 1200,
         "height": 800,
         "minWidth": 960,
