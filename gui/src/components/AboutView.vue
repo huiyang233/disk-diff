@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import {
-  HardDrive,
   Search,
   Sparkles,
   ShieldCheck,
@@ -42,7 +41,7 @@ const useCases = computed(() => [
       <!-- Header -->
       <div class="about-header">
         <div class="logo-box">
-          <HardDrive :size="32" class="logo-icon" />
+          <img src="/app-icon.png" alt="DiskDiff" class="about-app-icon" />
         </div>
         <div class="header-info">
           <div class="title-row">
@@ -144,17 +143,19 @@ const useCases = computed(() => [
 .logo-box {
   width: 52px;
   height: 52px;
-  border-radius: var(--radius-md);
-  background: rgba(56, 189, 248, 0.12);
-  border: 1px solid rgba(56, 189, 248, 0.25);
+  border-radius: 12px;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+  overflow: hidden;
 }
 
-.logo-icon {
-  color: #38bdf8;
+.about-app-icon {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .header-info {

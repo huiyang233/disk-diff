@@ -36,7 +36,7 @@ const navItems = computed(() => [
     <!-- Brand Logo Section -->
     <div class="sidebar-brand">
       <div class="brand-logo-glow">
-        <HardDrive :size="16" class="brand-icon" />
+        <img src="/app-icon.png" alt="DiskDiff" class="brand-img" />
       </div>
       <div class="brand-text">
         <span class="brand-name">DiskDiff</span>
@@ -110,17 +110,19 @@ const navItems = computed(() => [
 .brand-logo-glow {
   width: 28px;
   height: 28px;
-  border-radius: var(--radius-sm);
-  background: linear-gradient(180deg, rgba(56, 189, 248, 0.15) 0%, rgba(59, 130, 246, 0.25) 100%);
-  border: 1px solid rgba(56, 189, 248, 0.3);
+  border-radius: 7px;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+  overflow: hidden;
+  flex-shrink: 0;
 }
 
-.brand-icon {
-  color: #38bdf8;
+.brand-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .brand-text {
