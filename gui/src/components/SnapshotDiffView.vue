@@ -19,7 +19,7 @@ import TreemapView from './TreemapView.vue';
 import ListView from './ListView.vue';
 import Breadcrumb from './Breadcrumb.vue';
 
-const { t, isZh } = useI18n();
+const { t } = useI18n();
 import type {
   ColorTheme,
   DiffDirectoryView,
@@ -200,9 +200,9 @@ function handleStartDiff() {
             <GitCompare :size="22" class="computing-spin-icon" />
           </div>
           <div class="computing-title-box">
-            <h3>正在进行多线程深度快照对比...</h3>
+            <h3>{{ t('diff.computingTitle') }}</h3>
             <span class="computing-stage">
-              {{ diffProgress?.stage || '正在递归比对数百万节点差异与计算涨跌幅...' }}
+              {{ diffProgress?.stage || t('diff.computingStageDefault') }}
             </span>
           </div>
         </div>
@@ -216,7 +216,7 @@ function handleStartDiff() {
         </div>
 
         <div class="diff-hint-row">
-          <span>Rust 差异引擎正在高速遍历比对节点</span>
+          <span>{{ t('diff.computingHint') }}</span>
           <span class="diff-pct-text">{{ diffProgress?.progress_percent || 45 }}%</span>
         </div>
       </div>
@@ -230,11 +230,11 @@ function handleStartDiff() {
           <GitCompare :size="16" class="diff-icon" />
           <div class="diff-names">
             <span class="old-snap-tag" :title="diffMeta.snapshot_a_name">
-              基准: {{ diffMeta.snapshot_a_name }}
+              {{ t('diff.basePrefix', { name: diffMeta.snapshot_a_name }) }}
             </span>
             <ArrowRight :size="12" class="arrow-icon" />
             <span class="new-snap-tag" :title="diffMeta.snapshot_b_name">
-              对比: {{ diffMeta.snapshot_b_name }}
+              {{ t('diff.comparePrefix', { name: diffMeta.snapshot_b_name }) }}
             </span>
           </div>
 
@@ -276,17 +276,17 @@ function handleStartDiff() {
           <!-- Color theme switch -->
           <button
             class="btn-secondary btn-sm theme-btn"
-            :title="isZh ? '切换红绿配色模式' : 'Toggle Color Theme'"
+            :title="t('diff.themeToggleTitle')"
             @click="emit('update:colorTheme', colorTheme === 'stock_cn' ? 'stock_us' : 'stock_cn')"
           >
             <TrendingUp :size="13" />
-            <span>{{ colorTheme === 'stock_cn' ? (isZh ? '红涨绿跌' : 'Red Up') : (isZh ? '绿涨红跌' : 'Green Up') }}</span>
+            <span>{{ colorTheme === 'stock_cn' ? t('diff.themeStockCn') : t('diff.themeStockUs') }}</span>
           </button>
 
           <!-- Exit diff button -->
           <button class="btn-primary btn-sm" @click="emit('exitDiff')">
             <RotateCcw :size="13" />
-            <span>{{ isZh ? '退出对比' : 'Exit Diff' }}</span>
+            <span>{{ t('diff.exitDiff') }}</span>
           </button>
         </div>
       </header>
@@ -342,8 +342,8 @@ function handleStartDiff() {
               @click="compareWithCurrent = true"
             >
               <Zap :size="13" />
-              <span>{{ isZh ? '基准快照 VS 当前活动扫描' : 'Baseline VS Active Scan' }}</span>
-              <span v-if="!rustActiveSnapshot" class="status-tip">({{ isZh ? '无活动扫描' : 'No Active Scan' }})</span>
+              <span>{{ t('diff.modeActiveScan') }}</span>
+              <span v-if="!rustActiveSnapshot" class="status-tip">({{ t('diff.noActiveScan') }})</span>
             </button>
 
             <button
@@ -352,7 +352,7 @@ function handleStartDiff() {
               @click="compareWithCurrent = false"
             >
               <Layers :size="13" />
-              <span>{{ isZh ? '对比两份已存历史快照' : 'Compare Two Saved Snapshots' }}</span>
+              <span>{{ t('diff.modeTwoSnapshots') }}</span>
             </button>
           </div>
         </div>
@@ -373,7 +373,7 @@ function handleStartDiff() {
                 </span>
               </div>
               <span class="step-subtitle">
-                {{ compareWithCurrent && rustActiveSnapshot ? (isZh ? '仅可选择与活动扫描相同根目录的快照' : 'Only snapshots with matching root directory') : (isZh ? '点击选择作为对比基准的原始快照' : 'Click to select or unselect baseline snapshot') }}
+                {{ compareWithCurrent && rustActiveSnapshot ? t('diff.baseSubtitleActive') : t('diff.baseSubtitle') }}
               </span>
             </div>
 
@@ -395,7 +395,7 @@ function handleStartDiff() {
                   <div class="card-status-slot">
                     <span v-if="selectedOldSnapshot?.id === snap.id" class="status-badge selected-base">
                       <CheckCircle2 :size="11" />
-                      <span>{{ isZh ? '已选基准' : 'Selected' }}</span>
+                      <span>{{ t('diff.selectedBase') }}</span>
                     </span>
                   </div>
                 </div>
@@ -417,7 +417,7 @@ function handleStartDiff() {
 
               <div v-if="filteredOldSnapshots.length === 0" class="empty-column-state">
                 <Layers :size="28" class="empty-icon" />
-                <p>{{ compareWithCurrent && rustActiveSnapshot ? (isZh ? '暂无与当前活动扫描同一根目录的历史快照' : 'No saved snapshots matching active scan path') : (isZh ? '暂无已保存快照，请先在「磁盘扫描」中扫描并保存快照' : 'No saved snapshots found') }}</p>
+                <p>{{ compareWithCurrent && rustActiveSnapshot ? t('diff.emptyActiveScanOld') : t('diff.emptyOldList') }}</p>
               </div>
             </div>
           </div>
@@ -434,7 +434,7 @@ function handleStartDiff() {
                 </span>
               </div>
               <span class="step-subtitle">
-                {{ selectedOldSnapshot ? (isZh ? '已自动过滤为同一根目录的历史快照' : 'Filtered to matching root directory snapshots') : (isZh ? '点击选择要与基准比对的新快照' : 'Click to select target snapshot') }}
+                {{ selectedOldSnapshot ? t('diff.targetSubtitleFiltered') : t('diff.targetSubtitle') }}
               </span>
             </div>
 
@@ -456,7 +456,7 @@ function handleStartDiff() {
                   <div class="card-status-slot">
                     <span v-if="selectedNewSnapshot?.id === snap.id" class="status-badge selected-compare">
                       <CheckCircle2 :size="11" />
-                      <span>{{ isZh ? '已选对比' : 'Selected' }}</span>
+                      <span>{{ t('diff.selectedCompare') }}</span>
                     </span>
                   </div>
                 </div>
@@ -478,7 +478,7 @@ function handleStartDiff() {
 
               <div v-if="filteredNewSnapshots.length === 0" class="empty-column-state">
                 <Layers :size="28" class="empty-icon" />
-                <p>{{ selectedOldSnapshot ? (isZh ? '该根目录下暂无其他可供对比的历史快照' : 'No other saved snapshots found for this directory') : (isZh ? '暂无已保存快照' : 'No saved snapshots') }}</p>
+                <p>{{ selectedOldSnapshot ? t('diff.noOtherSnapshotsDesc') : t('diff.emptyOldTitle') }}</p>
               </div>
             </div>
           </div>
@@ -486,15 +486,15 @@ function handleStartDiff() {
           <!-- B: Current Active Scan Preview Card -->
           <div v-else class="selection-column current-active-column">
             <div class="column-header">
-              <span class="step-badge compare">2. {{ isZh ? '对比目标 (当前内存活动数据)' : 'Target (Current Scan in Memory)' }}</span>
-              <span class="step-subtitle">{{ isZh ? '直接读取 Rust 后端内存中保存的扫描数据' : 'Loaded directly from Rust memory' }}</span>
+              <span class="step-badge compare">2. {{ t('diff.targetActiveTitle') }}</span>
+              <span class="step-subtitle">{{ t('diff.targetActiveDesc') }}</span>
             </div>
 
             <div v-if="rustActiveSnapshot" class="active-scan-preview-card">
               <div class="preview-badge-row">
                 <span class="live-pulse-badge">
                   <span class="live-dot" />
-                  {{ isZh ? 'Rust 后端活跃内存数据' : 'Rust Backend Active Data' }}
+                  {{ t('diff.rustActiveData') }}
                 </span>
                 <span class="size-highlight">{{ formatBytes(rustActiveSnapshot.total_size) }}</span>
               </div>
@@ -507,11 +507,11 @@ function handleStartDiff() {
 
               <div class="preview-metrics-grid">
                 <div class="p-item">
-                  <span class="p-label">{{ isZh ? '扫描文件' : 'Files' }}</span>
+                  <span class="p-label">{{ t('topbar.files') }}</span>
                   <span class="p-val">{{ formatNumber(rustActiveSnapshot.total_files) }}</span>
                 </div>
                 <div class="p-item">
-                  <span class="p-label">{{ isZh ? '遍历目录' : 'Dirs' }}</span>
+                  <span class="p-label">{{ t('topbar.dirs') }}</span>
                   <span class="p-val">{{ formatNumber(rustActiveSnapshot.total_dirs) }}</span>
                 </div>
               </div>
@@ -519,7 +519,7 @@ function handleStartDiff() {
 
             <div v-else class="empty-column-state">
               <Zap :size="28" class="empty-icon" />
-              <p>{{ isZh ? 'Rust 引擎当前暂无常驻扫描数据，请先扫描或选择两份历史快照进行对比' : 'No active scan in memory. Please scan first or pick two snapshots.' }}</p>
+              <p>{{ t('diff.noActiveDataDesc') }}</p>
             </div>
           </div>
         </div>

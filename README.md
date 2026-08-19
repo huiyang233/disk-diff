@@ -2,91 +2,107 @@
 
 # 💽 DiskDiff
 
-**轻量、极速的磁盘空间分析与快照增量对比工具**
+**A lightweight, high-performance disk space analyzer and snapshot differential tool.**
+
+[English](README.md) | [简体中文](README_ZH.md)
 
 [![Rust](https://img.shields.io/badge/Rust-1.80%2B-orange.svg?style=flat-square&logo=rust)](https://www.rust-lang.org/)
 [![Tauri](https://img.shields.io/badge/Tauri-2.0-24C8D5.svg?style=flat-square&logo=tauri)](https://tauri.app/)
 [![Vue 3](https://img.shields.io/badge/Vue-3.5%2B-4FC08D.svg?style=flat-square&logo=vue.js)](https://vuejs.org/)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square)](LICENSE)
-[![Platform](https://img.shields.io/badge/Platform-macOS%20%7C%20Windows%20%7C%20Linux-lightgrey.svg?style=flat-square)](#-跨平台支持)
+[![Platform](https://img.shields.io/badge/Platform-macOS%20%7C%20Windows%20%7C%20Linux-lightgrey.svg?style=flat-square)](#-cross-platform-support)
 
 </div>
 
 ---
 
-## 💡 为什么写这个软件？
+## 📸 Screenshots
 
-平时电脑用着用着磁盘空间经常告急。虽然市面上有很多优秀的磁盘清理和分析软件，但它们大多只能看**「当前哪个文件夹最大」**，却很难回答**「从上周到今天，到底是什么东西在偷偷暴涨」**。
+### 1. Disk Space Scan
+> High-throughput parallel scanning with bottom-up size rollup, visualized through an intuitive stock-market treemap.
 
-传统的比对工具要么体积庞大臃肿，要么不支持直观的热力图下钻定位。
+![Disk Space Scan](docs/screenshots/image_scan.png)
 
-于是干脆用 **Rust + Tauri 2.0 + Vue 3** 为自己写了这个轻量、纯粹的小工具：**快速给文件夹拍个快照，隔段时间拉出来比对，哪里涨了、哪里删了以股市热力图直接呈现，一目了然！**
+### 2. Snapshot Differential Analysis (Diff)
+> Compare any two historical snapshots (or compare directly against active memory scan). Subtree pruning and color heatmaps make spotting bloated files effortless.
 
----
-
-## 🚀 核心功能特性
-
-### 1. ⚡ Rayon 多核并发磁盘扫描
-- **多核心工作窃取**：利用 Rust Rayon 工作窃取线程池（Work-Stealing Pool）并行并发遍历文件树，跑满现代 NVMe SSD 的极致 IOPS。
-- **自底向上逐层归集**：自动统计每层目录的总体积、文件数与子目录数，大目录永远排在最前。
-- **毫秒级防抖流式反馈**：每 50ms 节流向前端推送原子扫描进度，丝滑流畅绝不阻塞 UI。
-- **软硬链接安全防护**：自动识别 Unix Inode 防止硬链接重复计重，不跟随软链接防止循环死锁。
-
-### 2. 📈 股市风格容量热力图 (Treemap)
-- **单层下钻架构**：基于 D3.js 自定义实现的 Squarified Treemap，仅渲染当前层级（Top-N 聚类合并），轻松承载数百万节点而不卡顿。
-- **红绿/绿红涨跌双配色**：支持 A 股红涨绿跌（红增绿减）与国际绿涨红跌双配色模式切换。
-- **多视图切换**：支持热力图与列表视图无缝切换，右键可快速定位系统文件管理器（Finder / Explorer）。
-
-### 3. 🔍 深度快照增量比对 (Diff Engine)
-- **同级目录智能剪枝（Subtree Pruning）**：对比两期快照时，若检测到子目录元数据一致，瞬间剪枝跳过数十万未修改节点，比对速度成倍提升。
-- **双路并发解压**：通过 `rayon::join` 双线程并行解压和反序列化两份历史快照，载入耗时直接减半。
-- **多维度变动计算**：自动精准计算每个节点的绝对变动体积（$\Delta \text{size}$）与相对涨跌百分比（$\Delta \%$）。
-
-### 4. 🗜️ 自定义二进制高压缩快照格式 (`.snap`)
-- **独立元数据头部**：专有二进制容器设计，毫秒级快速读取快照元数据（名称、路径、容量、文件数），无需解压整颗多叉树。
-- **Zstd Level 9 + Bincode**：数百万节点的数据树压缩后仅占数十兆，比纯文本节省 90% 以上存储空间。
-
-### 5. 🧠 后端常驻与按需切片加载架构
-- **Rust 后端高效托管**：数百万节点的完整数据树由 Rust 原生常驻管理，享受原生内存布局与零垃圾回收（No GC）优势。
-- **单层轻量切片回传**：前端 Vue 通过 Tauri IPC 仅按需拉取当前层级的视图切片（单次传输 < 10KB），彻底避免将数百万个 JS 对象塞入前端导致页面掉帧与卡死。
+![Snapshot Diff](docs/screenshots/image_diff.png)
 
 ---
 
-## 🖥️ 跨平台支持
+## 💡 Why DiskDiff?
 
-DiskDiff 原生支持全主流操作系统与架构：
+Disk storage often runs out unexpectedly. While there are many disk analyzer tools available, most of them only show **"which folder is currently the largest"**, but cannot answer **"what exactly grew or changed between last week and today"**.
 
-- **macOS**：Apple Silicon (M1/M2/M3/M4, `arm64`)
-- **Windows**：Windows 10 / 11 (`x86_64`)
-- **Linux**：Ubuntu / Debian / Arch (`x86_64` & `arm64`)
+Traditional folder diff utilities are often clunky, slow, or lack intuitive treemap visual drill-down.
+
+DiskDiff was built with **Rust + Tauri 2.0 + Vue 3** to provide a fast, elegant solution: **take snapshots of any directory, compare them whenever you want, and spot exactly what expanded or shrank using clear stock-market style heatmaps.**
 
 ---
 
-## 🛠️ 本地开发与构建
+## 🚀 Key Features
 
-### 1. 环境准备
+### 1. ⚡ Multi-Threaded Concurrent Disk Scanning (Rayon)
+- **Work-Stealing Pool**: Leverages Rust's Rayon work-stealing thread pool to parallelize directory tree traversal, maximizing modern NVMe SSD IOPS throughput.
+- **Bottom-Up Rollup**: Automatically aggregates file sizes, file counts, and subdirectories hierarchically, always ordering largest items first.
+- **Throttled Live Feedback**: Emits atomic scan progress updates every 50ms, ensuring silky-smooth UI responsiveness without thread starvation.
+- **Symlink & Hardlink Protection**: Detects Unix inodes to prevent duplicate counting of hard links and avoids traversing symlinks to eliminate infinite recursive loops.
+
+### 2. 📈 Stock-Market Style Capacity Treemap
+- **Single-Level Drill-Down Architecture**: Custom D3.js squarified treemap rendering only the active directory level with Top-N overflow clustering, handling millions of nodes with ease.
+- **Dual Palette Modes**: Supports Chinese stock market style (Red gain / Green loss) and International style (Green gain / Red loss).
+- **Multi-View Exploration**: Seamless toggle between responsive Treemap and searchable List View, with one-click "Reveal in Finder / Explorer".
+
+### 3. 🔍 Deep Snapshot Differential Engine (Diff)
+- **Subtree Pruning Acceleration**: Skips traversing hundreds of thousands of unchanged nodes instantly when sub-directory metadata matches between snapshots.
+- **Parallel Decompression**: Employs `rayon::join` to decompress and deserialize both snapshots concurrently, cutting load latency in half.
+- **Multi-Dimensional Metrics**: Computes exact delta sizes ($\Delta \text{size}$) and percentage shifts ($\Delta \%$) for every node.
+
+### 4. 🗜️ High-Compression Binary Snapshot Format (`.snap`)
+- **Discrete Metadata Header**: Containerized binary design enables sub-millisecond retrieval of snapshot metadata without decompressing the multi-million node tree.
+- **Zstd Level 9 + Bincode**: Compresses millions of nodes into just a few megabytes—saving over 90% space compared to plain text/JSON.
+
+### 5. 🧠 Rust Backend In-Memory Management & Sliced IPC
+- **Native Memory Hosting**: Massive directory trees reside directly inside Rust native memory with zero garbage collection overhead.
+- **Sliced IPC Delivery**: Frontend Vue queries only the visible viewport slice via Tauri IPC (< 10KB per request), preventing browser UI lag or OOM crashes.
+
+---
+
+## 🖥️ Cross-Platform Support
+
+DiskDiff natively supports major desktop operating systems and architectures:
+
+- **macOS**: Apple Silicon (M1/M2/M3/M4, `arm64`) & Intel (`x86_64`)
+- **Windows**: Windows 10 / 11 (`x86_64`)
+- **Linux**: Ubuntu / Debian / Arch (`x86_64` & `arm64`)
+
+---
+
+## 🛠️ Development & Build Guide
+
+### 1. Prerequisites
 - [Node.js](https://nodejs.org/) (v18+)
 - [Rust](https://www.rust-lang.org/) (v1.80+)
 - [Tauri 2.0 CLI](https://v2.tauri.app/start/prerequisites/)
 
-### 2. 安装依赖
+### 2. Install Dependencies
 ```bash
-npm install
+cd gui && npm install
 ```
 
-### 3. 启动本地开发
+### 3. Start Local Development
 ```bash
 npm run tauri dev
 ```
 
-### 4. 本地打包构建
+### 4. Build Release Package
 ```bash
 npm run tauri build
 ```
-打包输出路径位于 `src-tauri/target/release/bundle/`。
+The compiled application packages will be generated under `gui/src-tauri/target/release/bundle/`.
 
 ---
 
-## 📄 开源许可证
+## 📄 License
 
-本项目基于 [MIT License](LICENSE) 协议开源。
+This project is licensed under the [MIT License](LICENSE).

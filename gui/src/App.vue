@@ -19,7 +19,7 @@ import { formatBytes, formatNumber } from './composables/useFormat';
 import { useI18n } from './composables/useI18n';
 import { useSettings } from './composables/useSettings';
 
-const { t, isZh } = useI18n();
+const { t } = useI18n();
 const { customStorageDir, colorTheme, initSettings } = useSettings();
 
 const appToastMsg = ref('');
@@ -162,7 +162,7 @@ async function handlePickDirectory() {
     const selected = await open({
       directory: true,
       multiple: false,
-      title: isZh.value ? '选择要扫描分析的文件夹' : 'Select Folder to Scan',
+      title: t('app.dialogTitle'),
     });
 
     if (selected && typeof selected === 'string') {
@@ -193,7 +193,7 @@ async function handleStartScan() {
     await refreshSavedSnapshots();
   } catch (err: any) {
     if (err !== 'Scan cancelled by user') {
-      showAppToast(`${isZh.value ? '扫描出错' : 'Scan failed'}: ${err}`);
+      showAppToast(t('app.scanError', { error: String(err) }));
     }
   } finally {
     isScanning.value = false;
@@ -268,9 +268,9 @@ async function handleSaveSnapshot(customName: string) {
     });
     await refreshSavedSnapshots();
     saveSnapshotModalVisible.value = false;
-    showAppToast(isZh.value ? `快照已成功保存` : `Snapshot saved successfully!`);
+    showAppToast(t('app.saveSuccess'));
   } catch (err) {
-    showAppToast(`${isZh.value ? '保存快照失败' : 'Failed to save snapshot'}: ${err}`);
+    showAppToast(t('app.saveFailed', { error: String(err) }));
   } finally {
     isSavingSnapshot.value = false;
   }
@@ -293,9 +293,9 @@ async function handleOpenSavedSnapshot(snapMeta: SnapshotMeta) {
     scanNavTrail.value = [{ name: res.root_view.name || 'Root', path: res.root_view.path }];
     saveSnapshotModalVisible.value = false;
     activeNavTab.value = 'scan';
-    showAppToast(isZh.value ? `已载入快照: ${snapMeta.name}` : `Loaded snapshot: ${snapMeta.name}`);
+    showAppToast(t('app.loadedSnapshot', { name: snapMeta.name }));
   } catch (err) {
-    showAppToast(`${isZh.value ? '打开快照失败' : 'Failed to open snapshot'}: ${err}`);
+    showAppToast(t('app.openSnapshotFailed', { error: String(err) }));
   } finally {
     loadingSnapshotId.value = null;
   }
@@ -309,9 +309,9 @@ async function handleDeleteSnapshot(snapshotId: string) {
       customDir: customStorageDir.value || undefined,
     });
     savedSnapshots.value = updatedList;
-    showAppToast(isZh.value ? '已成功删除快照' : 'Snapshot deleted');
+    showAppToast(t('app.snapshotDeleted'));
   } catch (err) {
-    showAppToast(`${isZh.value ? '删除快照失败' : 'Failed to delete snapshot'}: ${err}`);
+    showAppToast(t('app.deleteSnapshotFailed', { error: String(err) }));
   }
 }
 
@@ -322,8 +322,8 @@ async function handleLoadSnapshotFile() {
     const selected = await open({
       directory: false,
       multiple: false,
-      filters: [{ name: 'Snapshot File', extensions: ['snap'] }],
-      title: isZh.value ? '打开磁盘快照文件' : 'Open Snapshot File',
+      filters: [{ name: t('app.snapFilterName'), extensions: ['snap'] }],
+      title: t('app.openSnapDialogTitle'),
     });
 
     if (selected && typeof selected === 'string') {
@@ -338,10 +338,10 @@ async function handleLoadSnapshotFile() {
       scanNavTrail.value = [{ name: res.root_view.name || 'Root', path: res.root_view.path }];
       saveSnapshotModalVisible.value = false;
       activeNavTab.value = 'scan';
-      showAppToast(isZh.value ? `已载入外部快照文件` : `Loaded external snapshot file`);
+      showAppToast(t('app.loadedExternal'));
     }
   } catch (err) {
-    showAppToast(`${isZh.value ? '加载快照失败' : 'Failed to load snapshot'}: ${err}`);
+    showAppToast(t('app.loadExternalFailed', { error: String(err) }));
   } finally {
     isLoadingExternal.value = false;
   }
@@ -359,7 +359,7 @@ async function handleDiffSnapshots(
   try {
     isDiffing.value = true;
     diffProgress.value = {
-      stage: isZh.value ? '正在启动深度对比引擎...' : 'Initializing differential engine...',
+      stage: t('diff.engineStarting'),
       progress_percent: 5,
       is_done: false,
     };
@@ -391,7 +391,7 @@ async function handleDiffSnapshots(
     diffNavTrail.value = [{ name: res.root_view.name || 'Root', path: res.root_view.path }];
     activeNavTab.value = 'diff';
   } catch (err) {
-    showAppToast(`${isZh.value ? '对比分析失败' : 'Differential analysis failed'}: ${err}`);
+    showAppToast(t('app.diffFailed', { error: String(err) }));
   } finally {
     isDiffing.value = false;
     diffProgress.value = null;
@@ -504,9 +504,9 @@ async function handleRevealInFinder(path: string) {
               <div class="scanning-header">
                 <div class="spinner" />
                 <div class="scanning-title-box">
-                  <h3>{{ isZh ? '正在高速多线程扫描目录...' : 'Multi-threaded disk scanning in progress...' }}</h3>
+                  <h3>{{ t('app.scanningTitle') }}</h3>
                   <div class="scan-target-path" :title="selectedPath">
-                    {{ isZh ? '目标目录' : 'Target' }}: <span>{{ selectedPath }}</span>
+                    {{ t('app.targetDir') }}: <span>{{ selectedPath }}</span>
                   </div>
                 </div>
               </div>
@@ -519,19 +519,19 @@ async function handleRevealInFinder(path: string) {
               <!-- Metrics 3-card grid -->
               <div class="scan-metrics-grid">
                 <div class="metric-card">
-                  <span class="metric-label">{{ isZh ? '累计容量' : 'Total Size' }}</span>
+                  <span class="metric-label">{{ t('app.totalSize') }}</span>
                   <span class="metric-value highlight">
                     {{ scanProgress ? formatBytes(scanProgress.total_size) : '0 B' }}
                   </span>
                 </div>
                 <div class="metric-card">
-                  <span class="metric-label">{{ isZh ? '已发现文件' : 'Files Found' }}</span>
+                  <span class="metric-label">{{ t('app.filesFound') }}</span>
                   <span class="metric-value">
                     {{ scanProgress ? formatNumber(scanProgress.scanned_files) : '0' }}
                   </span>
                 </div>
                 <div class="metric-card">
-                  <span class="metric-label">{{ isZh ? '已遍历文件夹' : 'Dirs Traversed' }}</span>
+                  <span class="metric-label">{{ t('app.dirsTraversed') }}</span>
                   <span class="metric-value">
                     {{ scanProgress ? formatNumber(scanProgress.scanned_dirs) : '0' }}
                   </span>
@@ -540,7 +540,7 @@ async function handleRevealInFinder(path: string) {
 
               <!-- Live Scanning File/Subdirectory Path -->
               <div class="live-scanning-path-box">
-                <span class="live-tag">{{ isZh ? '正在扫描:' : 'Scanning:' }}</span>
+                <span class="live-tag">{{ t('app.scanningLive') }}</span>
                 <span class="live-subpath" :title="scanProgress?.current_path || selectedPath">
                   {{ scanProgress?.current_path || selectedPath }}
                 </span>
@@ -581,9 +581,9 @@ async function handleRevealInFinder(path: string) {
               <div class="welcome-icon-glow">
                 <HardDrive :size="36" class="welcome-icon" />
               </div>
-              <h2>{{ isZh ? '选择要扫描分析的文件夹' : 'Select a Directory to Analyze' }}</h2>
+              <h2>{{ t('app.welcomeTitle') }}</h2>
               <p class="welcome-desc">
-                {{ isZh ? '多线程并发遍历，通过矩形树图可视化分析磁盘容量分布与大文件占比' : 'High-throughput parallel scanner with intuitive stock-style treemap visualization' }}
+                {{ t('app.welcomeDesc') }}
               </p>
 
               <!-- Central Directory Selector Zone -->
@@ -593,10 +593,10 @@ async function handleRevealInFinder(path: string) {
                 </div>
                 <div class="zone-text">
                   <span v-if="selectedPath" class="path-selected" :title="selectedPath">{{ selectedPath }}</span>
-                  <span v-else class="path-placeholder">{{ isZh ? '点击选择电脑上的任意文件夹或磁盘路径...' : 'Click to choose any folder or disk volume...' }}</span>
+                  <span v-else class="path-placeholder">{{ t('app.welcomePlaceholder') }}</span>
                 </div>
                 <button class="btn-secondary btn-sm browse-btn" @click.stop="handlePickDirectory">
-                  {{ isZh ? '浏览...' : 'Browse...' }}
+                  {{ t('app.browseBtn') }}
                 </button>
               </div>
 
@@ -608,7 +608,7 @@ async function handleRevealInFinder(path: string) {
                   @click="handleStartScan"
                 >
                   <Play :size="16" />
-                  <span>{{ isZh ? '开始高速扫描' : 'Start Fast Scan' }}</span>
+                  <span>{{ t('app.startFastScan') }}</span>
                 </button>
               </div>
             </div>

@@ -1,5 +1,8 @@
 <script setup lang="ts">
 import { ChevronRight, Home, ArrowLeft } from 'lucide-vue-next';
+import { useI18n } from '../composables/useI18n';
+
+const { t } = useI18n();
 
 interface PathSegment {
   name: string;
@@ -24,21 +27,21 @@ const emit = defineEmits<{
     <div class="left-nav">
       <button
         class="home-btn"
-        title="返回初始选择页面"
+        :title="t('breadcrumb.homeTitle')"
         @click="emit('home')"
       >
         <Home :size="13" />
-        <span>主页</span>
+        <span>{{ t('breadcrumb.home') }}</span>
       </button>
 
       <button
         v-if="canGoBack"
         class="back-btn"
-        title="返回上一级目录"
+        :title="t('breadcrumb.upTitle')"
         @click="emit('back')"
       >
         <ArrowLeft :size="13" />
-        <span>上一级</span>
+        <span>{{ t('breadcrumb.up') }}</span>
       </button>
 
       <div class="divider" />

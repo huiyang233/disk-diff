@@ -15,7 +15,7 @@ import { formatBytes, formatNumber } from '../composables/useFormat';
 import { useI18n } from '../composables/useI18n';
 import type { SnapshotMeta } from '../types';
 
-const { t, isZh } = useI18n();
+const { t } = useI18n();
 
 const props = defineProps<{
   savedSnapshots: SnapshotMeta[];
@@ -47,9 +47,7 @@ const filteredSnapshots = computed(() => {
 });
 
 function handleDelete(snap: SnapshotMeta) {
-  const confirmMsg = isZh.value
-    ? `确定要删除快照「${snap.name}」吗？此操作不可恢复。`
-    : `Are you sure you want to delete snapshot "${snap.name}"? This cannot be undone.`;
+  const confirmMsg = t('snapshots.deleteConfirmNamed', { name: snap.name });
   if (confirm(confirmMsg)) {
     emit('deleteSnapshot', snap.id);
   }
@@ -64,7 +62,7 @@ function handleDelete(snap: SnapshotMeta) {
         <div class="page-title">
           <Layers :size="16" class="title-icon" />
           <h2>{{ t('snapshots.title') }}</h2>
-          <span class="count-pill">{{ savedSnapshots.length }} {{ isZh ? '份快照' : 'Snapshots' }}</span>
+          <span class="count-pill">{{ t('snapshots.countPill', { count: savedSnapshots.length }) }}</span>
         </div>
       </div>
 
@@ -75,7 +73,7 @@ function handleDelete(snap: SnapshotMeta) {
           <input
             v-model="searchQuery"
             type="text"
-            :placeholder="isZh ? '搜索快照名称、路径、日期...' : 'Search name, path, date...'"
+            :placeholder="t('snapshots.searchPlaceholder')"
             class="search-input"
           />
         </div>
@@ -84,11 +82,11 @@ function handleDelete(snap: SnapshotMeta) {
         <button
           v-if="currentSnapshotMeta"
           class="btn-primary btn-sm"
-          :title="isZh ? '将当前已完成的扫描保存为快照' : 'Save active scan as snapshot'"
+          :title="t('snapshots.saveActiveTooltip')"
           @click="emit('saveCurrentSnapshot')"
         >
           <Save :size="13" />
-          <span>{{ isZh ? '保存当前快照' : 'Save Active Snapshot' }}</span>
+          <span>{{ t('snapshots.saveActiveBtn') }}</span>
         </button>
 
         <button
@@ -140,11 +138,11 @@ function handleDelete(snap: SnapshotMeta) {
           <!-- 3-Metrics Grid -->
           <div class="card-metrics-grid">
             <div class="metric-item">
-              <span class="metric-label">{{ isZh ? '扫描容量' : 'Total Size' }}</span>
+              <span class="metric-label">{{ t('snapshots.totalSize') }}</span>
               <span class="metric-val size-val">{{ formatBytes(snap.total_size) }}</span>
             </div>
             <div class="metric-item">
-              <span class="metric-label">{{ isZh ? '文件 / 目录' : 'Files / Dirs' }}</span>
+              <span class="metric-label">{{ t('snapshots.filesDirs') }}</span>
               <span class="metric-val counts-val">
                 {{ formatNumber(snap.total_files) }} / {{ formatNumber(snap.total_dirs) }}
               </span>
@@ -177,11 +175,11 @@ function handleDelete(snap: SnapshotMeta) {
               </button>
               <button
                 class="btn-secondary btn-xs action-btn"
-                :title="isZh ? '以此快照为基准发起对比' : 'Diff with this snapshot'"
+                :title="t('snapshots.diffTooltip')"
                 @click="emit('diffWithSnapshot', snap)"
               >
                 <GitCompare :size="12" />
-                <span>{{ isZh ? '对比' : 'Diff' }}</span>
+                <span>{{ t('snapshots.diffBtn') }}</span>
               </button>
             </div>
           </div>

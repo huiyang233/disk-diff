@@ -5,7 +5,7 @@ import { formatBytes, formatDelta, formatPercent, formatNumber } from '../compos
 import { useI18n } from '../composables/useI18n';
 import type { DiffStatus } from '../types';
 
-const { isZh } = useI18n();
+const { t } = useI18n();
 
 const props = defineProps<{
   visible: boolean;
@@ -58,19 +58,19 @@ const positionStyle = computed(() => {
     <div class="metrics-grid">
       <!-- Current Size -->
       <div class="metric-item">
-        <span class="label">{{ isZh ? '当前容量:' : 'Size:' }}</span>
+        <span class="label">{{ t('tooltip.size') }}</span>
         <span class="value size-value">{{ formatBytes(size) }}</span>
       </div>
 
       <!-- Diff specific metrics -->
       <template v-if="isDiffMode">
         <div v-if="oldSize !== undefined && oldSize !== null" class="metric-item">
-          <span class="label">{{ isZh ? '原容量:' : 'Old Size:' }}</span>
+          <span class="label">{{ t('tooltip.oldSize') }}</span>
           <span class="value">{{ formatBytes(oldSize) }}</span>
         </div>
 
         <div v-if="deltaSize !== undefined" class="metric-item">
-          <span class="label">{{ isZh ? '容量变动:' : 'Delta Size:' }}</span>
+          <span class="label">{{ t('tooltip.deltaSize') }}</span>
           <span
             class="value delta-value"
             :class="{
@@ -87,7 +87,7 @@ const positionStyle = computed(() => {
         </div>
 
         <div v-if="deltaPercent !== undefined" class="metric-item">
-          <span class="label">{{ isZh ? '变动幅度:' : 'Delta %:' }}</span>
+          <span class="label">{{ t('tooltip.deltaPercent') }}</span>
           <span
             class="badge"
             :class="{
@@ -101,7 +101,7 @@ const positionStyle = computed(() => {
         </div>
 
         <div v-if="status" class="metric-item">
-          <span class="label">{{ isZh ? '状态:' : 'Status:' }}</span>
+          <span class="label">{{ t('tooltip.status') }}</span>
           <span
             class="status-tag"
             :class="`status-${status}`"
@@ -110,12 +110,12 @@ const positionStyle = computed(() => {
             <Trash2 v-else-if="status === 'removed'" :size="11" />
             {{
               status === 'added'
-                ? (isZh ? '新增' : 'Added')
+                ? t('tooltip.statusAdded')
                 : status === 'removed'
-                ? (isZh ? '已删除' : 'Removed')
+                ? t('tooltip.statusRemoved')
                 : status === 'modified'
-                ? (isZh ? '容量变更' : 'Modified')
-                : (isZh ? '未变化' : 'Unchanged')
+                ? t('tooltip.statusModified')
+                : t('tooltip.statusUnchanged')
             }}
           </span>
         </div>
@@ -124,11 +124,11 @@ const positionStyle = computed(() => {
       <!-- Non-diff file count -->
       <template v-else-if="isDir">
         <div v-if="fileCount !== undefined" class="metric-item">
-          <span class="label">{{ isZh ? '文件总数:' : 'Files:' }}</span>
+          <span class="label">{{ t('tooltip.files') }}</span>
           <span class="value">{{ formatNumber(fileCount) }}</span>
         </div>
         <div v-if="dirCount !== undefined" class="metric-item">
-          <span class="label">{{ isZh ? '子文件夹:' : 'Subdirectories:' }}</span>
+          <span class="label">{{ t('tooltip.dirs') }}</span>
           <span class="value">{{ formatNumber(dirCount) }}</span>
         </div>
       </template>

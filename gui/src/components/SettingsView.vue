@@ -17,7 +17,7 @@ import { useI18n, type Locale } from '../composables/useI18n';
 import { useSettings } from '../composables/useSettings';
 import type { ColorTheme } from '../types';
 
-const { t, locale, setLocale, isZh } = useI18n();
+const { t, locale, setLocale } = useI18n();
 const {
   effectiveStorageDir,
   isCustomStorage,
@@ -48,7 +48,7 @@ const handleChangeStorageDir = async () => {
     const selected = await open({
       directory: true,
       multiple: false,
-      title: isZh.value ? '选择快照默认存储目录' : 'Select Default Snapshot Storage Directory',
+      title: t('settings.selectDirTitle'),
     });
 
     if (selected && typeof selected === 'string') {

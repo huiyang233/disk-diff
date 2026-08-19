@@ -10,7 +10,7 @@ import {
 import type { NavTab } from '../types';
 import { useI18n } from '../composables/useI18n';
 
-const { t, isZh } = useI18n();
+const { t } = useI18n();
 
 defineProps<{
   activeTab: NavTab;
@@ -76,7 +76,7 @@ const navItems = computed(() => [
     <div class="sidebar-footer">
       <div class="engine-status">
         <span class="status-dot" />
-        <span>Rust {{ isZh ? '引擎运行中' : 'Engine Ready' }}</span>
+        <span>Rust {{ t('sidebar.engineReady') }}</span>
       </div>
     </div>
   </aside>

@@ -5,7 +5,7 @@ import { formatBytes, formatNumber } from '../composables/useFormat';
 import { useI18n } from '../composables/useI18n';
 import type { SnapshotMeta } from '../types';
 
-const { t, isZh } = useI18n();
+const { t } = useI18n();
 
 const props = defineProps<{
   visible?: boolean;
@@ -23,7 +23,7 @@ const touched = ref(false);
 
 function initName() {
   if (props.currentSnapshotMeta) {
-    snapshotName.value = `${props.currentSnapshotMeta.name}_${isZh.value ? '快照' : 'snapshot'}`;
+    snapshotName.value = `${props.currentSnapshotMeta.name}_${t('saveModal.defaultSuffix')}`;
     touched.value = false;
   }
 }
@@ -88,7 +88,7 @@ function handleSave() {
             <div class="p-item">
               <span class="p-label">
                 <FileText :size="13" />
-                {{ isZh ? '文件总数' : 'Total Files' }}:
+                {{ t('saveModal.totalFiles') }}:
               </span>
               <span class="p-val">{{ formatNumber(currentSnapshotMeta.total_files) }}</span>
             </div>
@@ -101,7 +101,7 @@ function handleSave() {
             <span>{{ t('saveModal.nameLabel') }} <span class="required-star">*</span></span>
             <span v-if="touched && !isNameValid" class="error-hint">
               <AlertCircle :size="12" />
-              {{ isZh ? '快照名称不能为空' : 'Snapshot name cannot be empty' }}
+              {{ t('saveModal.nameRequired') }}
             </span>
           </label>
           <input
@@ -134,7 +134,7 @@ function handleSave() {
           >
             <Loader2 v-if="isSaving" :size="14" class="btn-spin" />
             <Save v-else :size="14" />
-            <span>{{ isSaving ? (isZh ? '正在高速压缩保存...' : 'Compressing...') : t('saveModal.saveBtn') }}</span>
+            <span>{{ isSaving ? t('saveModal.compressing') : t('saveModal.saveBtn') }}</span>
           </button>
         </div>
       </div>

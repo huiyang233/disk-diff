@@ -11,7 +11,7 @@ import { formatBytes, formatNumber } from '../composables/useFormat';
 import { useI18n } from '../composables/useI18n';
 import type { ScanProgress, ViewMode } from '../types';
 
-const { t, isZh } = useI18n();
+const { t } = useI18n();
 
 defineProps<{
   selectedPath: string;
@@ -77,7 +77,7 @@ const emit = defineEmits<{
     <!-- Center: Live Progress Bar (when scanning) -->
     <div v-if="isScanning && scanProgress" class="center-progress">
       <div class="progress-info">
-        <span class="progress-files">{{ isZh ? '已扫描' : 'Scanned' }}: {{ formatNumber(scanProgress.scanned_files) }} {{ t('topbar.files') }}</span>
+        <span class="progress-files">{{ t('topbar.scanned') }}: {{ formatNumber(scanProgress.scanned_files) }} {{ t('topbar.files') }}</span>
         <span class="progress-size">{{ formatBytes(scanProgress.total_size) }}</span>
       </div>
       <div class="progress-path" :title="scanProgress.current_path">

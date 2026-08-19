@@ -5,34 +5,40 @@ import {
   Sparkles,
   ShieldCheck,
   Heart,
+  Github,
+  ExternalLink,
 } from 'lucide-vue-next';
+import { openUrl } from '@tauri-apps/plugin-opener';
 import { useI18n } from '../composables/useI18n';
 
-const { t, isZh } = useI18n();
+const { t } = useI18n();
 
 const useCases = computed(() => [
   {
     icon: Search,
-    title: isZh.value ? '揪出偷偷膨胀的缓存与日志' : 'Identify Bloated Caches & Logs',
-    desc: isZh.value
-      ? '日常开发中 node_modules、构建缓存、Docker 镜像或应用日志经常莫名其妙变大，拍两个快照比对一下，哪儿暴涨了一目了然。'
-      : 'Quickly detect runaway log files, cache directories, node_modules, or container images growing unexpectedly over time.',
+    title: t('about.useCase1Title'),
+    desc: t('about.useCase1Desc'),
   },
   {
     icon: Sparkles,
-    title: isZh.value ? '大扫除前后留底比对' : 'Before & After Cleanup Verification',
-    desc: isZh.value
-      ? '在清理大文件或卸载软件前后各存一份快照，不仅能直观确认到底释放了多少空间，还能防止误删了重要目录。'
-      : 'Capture snapshots before and after cleaning disks or uninstalling heavy software to verify exact space reclaimed.',
+    title: t('about.useCase2Title'),
+    desc: t('about.useCase2Desc'),
   },
   {
     icon: ShieldCheck,
-    title: isZh.value ? '纯粹本地运行，隐私无忧' : '100% Local & Privacy-Respecting',
-    desc: isZh.value
-      ? '所有扫描和快照数据 100% 留在自己电脑本地，零多余网络请求，不做多余无用的功能，专注把磁盘对比这一件事做好。'
-      : 'All scanning and snapshot files remain strictly on your local disk with zero telemetry, background tracking, or network requests.',
+    title: t('about.useCase3Title'),
+    desc: t('about.useCase3Desc'),
   },
 ]);
+
+async function handleOpenGithub() {
+  const url = 'https://github.com/huiyang233/disk-diff';
+  try {
+    await openUrl(url);
+  } catch {
+    window.open(url, '_blank');
+  }
+}
 </script>
 
 <template>
@@ -48,7 +54,7 @@ const useCases = computed(() => [
             <h1>DiskDiff</h1>
             <span class="version-tag">v0.1.1</span>
           </div>
-          <p class="subtitle">{{ isZh ? '因为自己有磁盘对比需求而写的实用小工具' : 'A high-performance disk space analyzer & snapshot differential tool' }}</p>
+          <p class="subtitle">{{ t('about.subtitle') }}</p>
         </div>
       </div>
 
@@ -58,7 +64,7 @@ const useCases = computed(() => [
       <div class="story-section">
         <div class="section-title-row">
           <Heart :size="15" class="story-icon" />
-          <h3>{{ isZh ? '为什么写这个软件？' : 'Why was this built?' }}</h3>
+          <h3>{{ t('about.storyTitle') }}</h3>
         </div>
         <p class="story-p">
           {{ t('about.story1') }}
@@ -75,7 +81,7 @@ const useCases = computed(() => [
 
       <!-- Typical Use Cases -->
       <div class="usecase-section">
-        <h3>{{ isZh ? '平时主要用来干嘛？' : 'Common Use Cases' }}</h3>
+        <h3>{{ t('about.useCasesTitle') }}</h3>
         <div class="usecase-grid">
           <div
             v-for="item in useCases"
@@ -95,15 +101,27 @@ const useCases = computed(() => [
 
       <div class="divider-line" />
 
-      <!-- Tech Stack Badges -->
-      <div class="tech-section">
-        <span class="tech-label">{{ isZh ? '主要技术：' : 'Built with:' }}</span>
-        <div class="badges-row">
-          <span class="tech-badge">Tauri 2.0</span>
-          <span class="tech-badge">Rust (Rayon + Mimalloc)</span>
-          <span class="tech-badge">Vue 3 + TypeScript</span>
-          <span class="tech-badge">D3.js Treemap</span>
-          <span class="tech-badge">Zstd + Bincode</span>
+      <!-- GitHub Repository Link Section -->
+      <div class="github-section">
+        <div class="github-row">
+          <div class="github-left">
+            <Github :size="18" class="github-icon" />
+            <div class="github-text">
+              <span class="github-title">{{ t('about.githubRepo') }}</span>
+              <a
+                class="github-url"
+                href="https://github.com/huiyang233/disk-diff"
+                target="_blank"
+                @click.prevent="handleOpenGithub"
+              >
+                https://github.com/huiyang233/disk-diff
+              </a>
+            </div>
+          </div>
+          <button class="btn-secondary btn-sm github-btn" @click="handleOpenGithub">
+            <ExternalLink :size="13" />
+            <span>{{ t('about.openGithub') }}</span>
+          </button>
         </div>
       </div>
     </div>
@@ -294,31 +312,63 @@ const useCases = computed(() => [
   line-height: 1.5;
 }
 
-.tech-section {
+.github-section {
+  padding: 10px 14px;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+}
+
+.github-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.github-left {
   display: flex;
   align-items: center;
   gap: 10px;
-  font-size: 11.5px;
+  min-width: 0;
 }
 
-.tech-label {
+.github-icon {
+  color: var(--text-primary);
+  flex-shrink: 0;
+}
+
+.github-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.github-title {
+  font-size: 11px;
   color: var(--text-muted);
+  font-weight: 500;
+}
+
+.github-url {
+  font-size: 12px;
+  color: var(--accent-cyan);
+  font-family: var(--font-mono);
+  text-decoration: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.badges-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
+.github-url:hover {
+  text-decoration: underline;
 }
 
-.tech-badge {
-  padding: 2px 7px;
-  border-radius: var(--radius-xs);
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid var(--border-subtle);
-  font-size: 11px;
-  font-family: var(--font-mono);
-  color: var(--text-secondary);
+.github-btn {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 </style>

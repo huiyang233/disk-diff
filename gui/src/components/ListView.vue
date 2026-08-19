@@ -19,7 +19,7 @@ import type {
   FileItemView,
 } from '../types';
 
-const { t, isZh } = useI18n();
+const { t } = useI18n();
 
 const props = defineProps<{
   currentNode: DirectoryView | DiffDirectoryView | null;
@@ -142,12 +142,12 @@ function getItemRatio(item: ItemType): number {
         <input
           v-model="searchQuery"
           type="text"
-          :placeholder="isZh ? '快速筛选当前目录下的文件或文件夹...' : 'Filter files or directories...'"
+          :placeholder="t('list.filterPlaceholder')"
           class="search-input"
         />
       </div>
       <div class="count-info">
-        {{ isZh ? `共 ${items.length} 项` : `${items.length} items` }}
+        {{ t('list.itemsCount', { count: items.length }) }}
       </div>
     </div>
 
@@ -164,19 +164,19 @@ function getItemRatio(item: ItemType): number {
             </th>
             <th class="col-size" @click="handleSort('size')">
               <div class="th-content">
-                <span>{{ isZh ? '容量 / 占比' : 'Size / Ratio' }}</span>
+                <span>{{ t('list.sizeRatio') }}</span>
                 <ArrowUpDown :size="11" class="sort-icon" />
               </div>
             </th>
             <th v-if="isDiffMode" class="col-delta" @click="handleSort('delta')">
               <div class="th-content">
-                <span>{{ isZh ? '容量变动' : 'Delta Size' }}</span>
+                <span>{{ t('list.deltaSize') }}</span>
                 <ArrowUpDown :size="11" class="sort-icon" />
               </div>
             </th>
             <th v-if="isDiffMode" class="col-percent" @click="handleSort('percent')">
               <div class="th-content">
-                <span>{{ isZh ? '涨跌幅' : 'Delta %' }}</span>
+                <span>{{ t('list.deltaPercent') }}</span>
                 <ArrowUpDown :size="11" class="sort-icon" />
               </div>
             </th>
@@ -209,7 +209,7 @@ function getItemRatio(item: ItemType): number {
                   >
                     {{ item.name }}
                   </span>
-                  <span v-if="item.is_dir" class="dir-badge">{{ isZh ? '目录' : 'DIR' }}</span>
+                  <span v-if="item.is_dir" class="dir-badge">{{ t('list.dirBadge') }}</span>
                 </div>
               </div>
             </td>
@@ -248,28 +248,28 @@ function getItemRatio(item: ItemType): number {
                 :class="{
                   'badge-red': (item.delta_percent || 0) > 0,
                   'badge-green': (item.delta_percent || 0) < 0,
-                  'badge-neutral': (item.delta_percent || 0) === 0,
+                  'badge-muted': (item.delta_percent || 0) === 0,
                 }"
               >
-                {{ formatPercent(item.delta_percent) }}
+                {{ formatPercent(item.delta_percent || 0) }}
               </span>
             </td>
 
             <!-- File Count (Non-diff) -->
             <td v-if="!isDiffMode" class="col-counts">
               <span v-if="item.is_dir" class="count-text">
-                {{ formatNumber(item.file_count) }} {{ t('topbar.files') }}
+                {{ formatNumber(item.file_count || 0) }} {{ t('topbar.files') }}
               </span>
-              <span v-else class="count-text">-</span>
+              <span v-else class="count-text text-muted">-</span>
             </td>
 
             <!-- Actions -->
             <td class="col-actions">
-              <div class="action-buttons">
+              <div class="action-btn-group">
                 <button
                   v-if="item.is_dir"
                   class="action-btn"
-                  :title="isZh ? '进入此文件夹' : 'Drill down'"
+                  :title="t('list.drillDown')"
                   @click="emit('drillDown', item)"
                 >
                   <ArrowRight :size="13" />
@@ -290,7 +290,7 @@ function getItemRatio(item: ItemType): number {
             <td :colspan="isDiffMode ? 5 : 4" class="load-more-cell">
               <button class="btn-secondary load-more-btn" @click="loadMore">
                 <ChevronDown :size="13" />
-                {{ isZh ? `加载更多 (已显示 ${displayedItems.length} / 共 ${items.length} 项)` : `Load More (${displayedItems.length} of ${items.length})` }}
+                {{ t('list.loadMore', { shown: displayedItems.length, total: items.length }) }}
               </button>
             </td>
           </tr>
@@ -298,7 +298,7 @@ function getItemRatio(item: ItemType): number {
           <!-- Empty search result -->
           <tr v-if="items.length === 0">
             <td :colspan="isDiffMode ? 5 : 4" class="empty-cell">
-              {{ isZh ? '无匹配文件或文件夹' : 'No matching files or directories' }}
+              {{ t('list.noMatching') }}
             </td>
           </tr>
         </tbody>

@@ -7,7 +7,7 @@ import { getDiffColor, getScanColor } from '../composables/useColor';
 import { useI18n } from '../composables/useI18n';
 import TooltipCard from './TooltipCard.vue';
 
-const { t, isZh } = useI18n();
+const { t } = useI18n();
 import type {
   ColorTheme,
   DiffDirectoryView,
@@ -202,7 +202,7 @@ const layoutItems = computed<TreemapItem[]>(() => {
     const restTotalSize = restItems.reduce((sum, item) => sum + item.size, 0);
     displayList.push({
       node: null,
-      name: `... (其他 ${restItems.length} 项)`,
+      name: t('treemap.otherItems', { count: restItems.length }),
       path: props.currentNode.path,
       isDir: true,
       size: restTotalSize,
@@ -288,8 +288,8 @@ function handleMouseEnter(item: TreemapItem, event: MouseEvent) {
       visible: true,
       x: event.clientX,
       y: event.clientY,
-      name: isZh.value ? `其他 ${item.otherCount} 个较小文件/目录` : `${item.otherCount} other smaller items`,
-      path: isZh.value ? '超出展示限制的较小文件汇总' : 'Aggregated small files',
+      name: t('treemap.otherTooltipTitle', { count: item.otherCount || 0 }),
+      path: t('treemap.otherTooltipDesc'),
       isDir: true,
       size: item.size,
       oldSize: null,
@@ -331,18 +331,20 @@ function handleMouseLeave() {
 }
 
 function handleClick(item: TreemapItem) {
-  if (item.isDir && !item.isOtherGroup && item.originalNode) {
-    tooltip.value.visible = false;
+  if (item.isOtherGroup) return;
+  if (item.isDir && item.originalNode) {
     emit('drillDown', item.originalNode);
   }
 }
 
 function handleContextMenu(item: TreemapItem, event: MouseEvent) {
   event.preventDefault();
+  if (item.isOtherGroup) return;
+
   contextMenu.value = {
     visible: true,
-    x: event.clientX,
-    y: event.clientY,
+    x: Math.min(event.clientX, window.innerWidth - 200),
+    y: Math.min(event.clientY, window.innerHeight - 100),
     item,
   };
 }
@@ -352,22 +354,23 @@ function closeContextMenu() {
 }
 
 function openInFinder(item: TreemapItem | null) {
-  if (!item || item.isOtherGroup) return;
-  emit('revealInFinder', item.path);
-  closeContextMenu();
+  if (item) {
+    emit('revealInFinder', item.path);
+  }
+  contextMenu.value.visible = false;
 }
 
 function drillDownFromMenu(item: TreemapItem | null) {
-  if (!item || item.isOtherGroup) return;
-  handleClick(item);
-  closeContextMenu();
+  if (item && item.isDir && item.originalNode) {
+    emit('drillDown', item.originalNode);
+  }
+  contextMenu.value.visible = false;
 }
 </script>
 
 <template>
-  <div class="treemap-wrapper">
+  <div ref="containerRef" class="treemap-wrapper">
     <div
-      ref="containerRef"
       class="treemap-container"
       @mousemove="handleMouseMove"
     >
@@ -447,20 +450,6 @@ function drillDownFromMenu(item: TreemapItem | null) {
       </div>
     </div>
 
-    <!-- Legend bar at bottom for Diff Mode -->
-    <div v-if="isDiffMode" class="heatmap-legend glass-panel">
-      <span class="legend-desc">
-        {{ isZh ? '颜色深浅代表容量增减幅度：' : 'Color indicates capacity delta %:' }}
-      </span>
-      <div class="legend-scale">
-        <span class="scale-step red-deep">{{ isZh ? '+100% 暴增' : '+100% Gain' }}</span>
-        <span class="scale-step red-mid">{{ isZh ? '+20% 增加' : '+20% Up' }}</span>
-        <span class="scale-step gray">{{ isZh ? '0% 未变' : '0% Same' }}</span>
-        <span class="scale-step green-mid">{{ isZh ? '-20% 缩减' : '-20% Down' }}</span>
-        <span class="scale-step green-deep">{{ isZh ? '-100% 骤减' : '-100% Gone' }}</span>
-      </div>
-    </div>
-
     <!-- Hover Detail Tooltip -->
     <TooltipCard
       :visible="tooltip.visible"
@@ -491,7 +480,7 @@ function drillDownFromMenu(item: TreemapItem | null) {
         @click="drillDownFromMenu(contextMenu.item)"
       >
         <ArrowRight :size="14" />
-        <span>{{ isZh ? '进入该文件夹' : 'Drill down folder' }}</span>
+        <span>{{ t('treemap.contextDrillDown') }}</span>
       </div>
       <div class="menu-item" @click="openInFinder(contextMenu.item)">
         <ExternalLink :size="14" />
@@ -669,75 +658,6 @@ function drillDownFromMenu(item: TreemapItem | null) {
 
 .empty-text {
   font-size: 14px;
-}
-
-/* Legend */
-.heatmap-legend {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 14px;
-  padding: 6px 16px;
-  border-top: 1px solid var(--border-subtle);
-  font-size: 11.5px;
-  background: var(--bg-sidebar);
-  white-space: nowrap;
-  flex-shrink: 0;
-  min-height: 36px;
-  box-sizing: border-box;
-  overflow-x: auto;
-}
-
-.legend-desc {
-  color: var(--text-secondary);
-  white-space: nowrap;
-  flex-shrink: 0;
-}
-
-.legend-scale {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  white-space: nowrap;
-  flex-shrink: 0;
-}
-
-.scale-step {
-  padding: 2px 7px;
-  border-radius: var(--radius-sm);
-  font-family: var(--font-mono);
-  font-size: 11px;
-  font-weight: 600;
-  white-space: nowrap;
-  flex-shrink: 0;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.scale-step.red-deep {
-  background: rgba(220, 38, 38, 0.9);
-  color: #ffffff;
-}
-
-.scale-step.red-mid {
-  background: rgba(239, 68, 68, 0.45);
-  color: #fca5a5;
-}
-
-.scale-step.gray {
-  background: rgba(51, 65, 85, 0.7);
-  color: #cbd5e1;
-}
-
-.scale-step.green-mid {
-  background: rgba(16, 185, 129, 0.45);
-  color: #6ee7b7;
-}
-
-.scale-step.green-deep {
-  background: rgba(16, 185, 129, 0.9);
-  color: #ffffff;
 }
 
 /* Context Menu */
